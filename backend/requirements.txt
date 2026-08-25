@@ -1,0 +1,10 @@
+fastapi==0.112.0
+uvicorn[standard]==0.30.6
+sqlmodel==0.0.21
+aiosqlite==0.20.0
+pydantic==2.8.2
+pydantic-settings==2.4.0
+python-multipart==0.0.9
+edge-tts==6.1.11
+faster-whisper==1.1.0
+python-dotenv==1.0.1

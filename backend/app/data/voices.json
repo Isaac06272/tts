@@ -1,0 +1,212 @@
+[
+  {
+    "id": "en-US-AriaNeural",
+    "name": "Aria",
+    "locale": "en-US",
+    "gender": "Female",
+    "style": "cheerful"
+  },
+  {
+    "id": "en-US-GuyNeural",
+    "name": "Guy",
+    "locale": "en-US",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-US-JennyNeural",
+    "name": "Jenny",
+    "locale": "en-US",
+    "gender": "Female",
+    "style": "cheerful"
+  },
+  {
+    "id": "en-US-DavisNeural",
+    "name": "Davis",
+    "locale": "en-US",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-US-AmberNeural",
+    "name": "Amber",
+    "locale": "en-US",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-US-TonyNeural",
+    "name": "Tony",
+    "locale": "en-US",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-GB-LibbyNeural",
+    "name": "Libby",
+    "locale": "en-GB",
+    "gender": "Female",
+    "style": "cheerful"
+  },
+  {
+    "id": "en-GB-RyanNeural",
+    "name": "Ryan",
+    "locale": "en-GB",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-AU-NatashaNeural",
+    "name": "Natasha",
+    "locale": "en-AU",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-AU-WilliamNeural",
+    "name": "William",
+    "locale": "en-AU",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-CA-ClaraNeural",
+    "name": "Clara",
+    "locale": "en-CA",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-CA-LiamNeural",
+    "name": "Liam",
+    "locale": "en-CA",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-IN-NeerjaNeural",
+    "name": "Neerja",
+    "locale": "en-IN",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-IN-PrabhatNeural",
+    "name": "Prabhat",
+    "locale": "en-IN",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-NZ-MollyNeural",
+    "name": "Molly",
+    "locale": "en-NZ",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-NZ-MitchellNeural",
+    "name": "Mitchell",
+    "locale": "en-NZ",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-ZA-LeahNeural",
+    "name": "Leah",
+    "locale": "en-ZA",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-ZA-LukeNeural",
+    "name": "Luke",
+    "locale": "en-ZA",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-HK-YanNeural",
+    "name": "Yan",
+    "locale": "en-HK",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-HK-SamNeural",
+    "name": "Sam",
+    "locale": "en-HK",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-IE-EmilyNeural",
+    "name": "Emily",
+    "locale": "en-IE",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-IE-ConnorNeural",
+    "name": "Connor",
+    "locale": "en-IE",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-KE-AsiliaNeural",
+    "name": "Asilia",
+    "locale": "en-KE",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-KE-ChilembaNeural",
+    "name": "Chilemba",
+    "locale": "en-KE",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-NG-AbeoNeural",
+    "name": "Abeo",
+    "locale": "en-NG",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-NG-EzinneNeural",
+    "name": "Ezinne",
+    "locale": "en-NG",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-PH-JamesNeural",
+    "name": "James",
+    "locale": "en-PH",
+    "gender": "Male",
+    "style": "friendly"
+  },
+  {
+    "id": "en-PH-RosaNeural",
+    "name": "Rosa",
+    "locale": "en-PH",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-SG-LunaNeural",
+    "name": "Luna",
+    "locale": "en-SG",
+    "gender": "Female",
+    "style": "friendly"
+  },
+  {
+    "id": "en-SG-WayneNeural",
+    "name": "Wayne",
+    "locale": "en-SG",
+    "gender": "Male",
+    "style": "friendly"
+  }
+]
