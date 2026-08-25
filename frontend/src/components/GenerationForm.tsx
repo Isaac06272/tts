@@ -81,7 +81,7 @@ export function GenerationForm() {
         voice_id: response.voice_id,
         text_preview: response.text.slice(0, 100) + (response.text.length > 100 ? '...' : ''),
       });
-      setText(''); // Clear input on success
+      setText('');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Generation failed';
       setError(message);
@@ -97,7 +97,6 @@ export function GenerationForm() {
       return;
     }
 
-    // Validate file type
     const allowedTypes = ['.wav', '.mp3', '.m4a', '.flac', '.ogg', '.webm', '.aac'];
     const fileExt = audioFile.name.toLowerCase().substring(audioFile.name.lastIndexOf('.'));
     if (!allowedTypes.includes(fileExt)) {
@@ -105,7 +104,6 @@ export function GenerationForm() {
       return;
     }
 
-    // Validate file size (50MB)
     if (audioFile.size > 50 * 1024 * 1024) {
       setError('File too large. Maximum size is 50MB.');
       return;
@@ -119,11 +117,10 @@ export function GenerationForm() {
       const response = await api.transcribeAudio(audioFile);
       const transcript = response.transcript;
 
-      // Create a "virtual" generation for transcribed audio
       const transcriptId = `transcribe-${Date.now()}`;
       const virtualGeneration = {
         id: transcriptId,
-        audio_url: '', // We don't serve the uploaded audio
+        audio_url: '',
         transcript_url: `/static/outputs/${transcriptId}.json`,
         created_at: new Date().toISOString(),
         voice_id: 'transcribed-audio',
@@ -131,7 +128,6 @@ export function GenerationForm() {
         duration: transcript.duration,
       };
 
-      // Store transcript in sessionStorage
       sessionStorage.setItem(`transcript-${transcriptId}`, JSON.stringify(transcript));
       setCurrent(virtualGeneration as any);
       addToHistory({
@@ -166,49 +162,24 @@ export function GenerationForm() {
   const isOverLimit = charCount > maxChars;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <label htmlFor="text-input" className="block text-sm font-medium text-foreground mb-2">
-          Text Input
-        </label>
-        <textarea
-          id="text-input"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          disabled={isGenerating || voicesLoading}
-          placeholder="Enter text to convert to speech or generate transcript..."
-          className={cn(
-            'w-full min-h-[120px] p-4 bg-background border rounded-lg',
-            'focus:outline-none focus:ring-2 focus:ring-primary/50',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            'resize-y text-base leading-relaxed',
-            isOverLimit && 'border-destructive'
-          )}
-          maxLength={maxChars}
-          aria-describedby="char-count"
-        />
-        <div className="flex justify-between items-center mt-2">
-          <span
-            id="char-count"
-            className={cn('text-sm', isOverLimit ? 'text-destructive' : 'text-muted-foreground')}
-          >
-            {charCount} / {maxChars} characters
-          </span>
-          {isOverLimit && <AlertCircle className="h-4 w-4 text-destructive" />}
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+      {/* Error Alert */}
+      {error && (
+        <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-sm" role="alert">
+          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <p className="text-red-300">{error}</p>
         </div>
-      </div>
+      )}
 
       {/* Mode Selector */}
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Generation Mode
-        </label>
-        <div className="flex flex-wrap gap-4">
+      <fieldset className="space-y-3">
+        <legend className="text-caption text-fg-dim">Mode</legend>
+        <div className="flex flex-wrap gap-3" role="radiogroup" aria-label="Generation mode">
           <label className={cn(
-            'flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors',
+            'flex items-center gap-2 cursor-pointer px-4 py-3 rounded-lg border transition-all duration-150',
             mode === 'speech'
-              ? 'bg-primary/10 border-primary text-primary'
-              : 'border-input hover:bg-accent'
+              ? 'bg-accent-warm/10 border-accent-warm text-accent-warm shadow-[0_0_16px_rgba(212,168,67,0.15)]'
+              : 'border-border-subtle text-fg-muted hover:text-fg-primary hover:bg-bg-elevated hover:border-fg-dim'
           )}>
             <input
               type="radio"
@@ -218,15 +189,16 @@ export function GenerationForm() {
               onChange={() => setMode('speech')}
               disabled={isGenerating || voicesLoading}
               className="sr-only"
+              aria-label="Generate Speech"
             />
-            <Mic className="h-5 w-5" />
-            <span className="font-medium">Generate Speech + Transcript</span>
+            <Mic className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+            <span className="font-medium">Generate Speech</span>
           </label>
           <label className={cn(
-            'flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors',
+            'flex items-center gap-2 cursor-pointer px-4 py-3 rounded-lg border transition-all duration-150',
             mode === 'transcribe'
-              ? 'bg-primary/10 border-primary text-primary'
-              : 'border-input hover:bg-accent'
+              ? 'bg-accent-warm/10 border-accent-warm text-accent-warm shadow-[0_0_16px_rgba(212,168,67,0.15)]'
+              : 'border-border-subtle text-fg-muted hover:text-fg-primary hover:bg-bg-elevated hover:border-fg-dim'
           )}>
             <input
               type="radio"
@@ -236,27 +208,28 @@ export function GenerationForm() {
               onChange={() => setMode('transcribe')}
               disabled={isGenerating || voicesLoading}
               className="sr-only"
+              aria-label="Transcribe Audio File"
             />
-            <FileAudio className="h-5 w-5" />
-            <span className="font-medium">Transcribe Audio File</span>
+            <FileAudio className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+            <span className="font-medium">Transcribe Audio</span>
           </label>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-caption text-fg-dim">
           {mode === 'speech'
             ? 'Generates audio using Edge-TTS and creates timestamped transcript'
             : 'Upload an audio file (WAV, MP3, M4A, FLAC, OGG, WebM, AAC) to transcribe with timestamps'}
         </p>
-      </div>
+      </fieldset>
 
+      {/* Voice Selector (Speech mode only) */}
       {mode === 'speech' && (
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Voice
-          </label>
+        <div className="space-y-2">
+          <label htmlFor="voice-select" className="text-caption text-fg-dim">Voice</label>
           {voicesLoading ? (
-            <div className="h-12 bg-muted rounded-lg animate-pulse" />
+            <div className="h-12 surface-input animate-pulse" aria-busy="true" aria-label="Loading voices" />
           ) : (
             <VoiceSelector
+              id="voice-select"
               value={voiceId}
               onChange={setVoiceId}
               voices={voices}
@@ -266,30 +239,27 @@ export function GenerationForm() {
         </div>
       )}
 
+      {/* File Upload (Transcribe mode only) */}
       {mode === 'transcribe' && (
-        <div>
-          <label htmlFor="audio-file" className="block text-sm font-medium text-foreground mb-2">
-            Audio File
-          </label>
-          <div className={cn(
-            'flex items-center justify-center w-full',
-            isGenerating && 'opacity-50 pointer-events-none'
-          )}>
+        <div className="space-y-2">
+          <label htmlFor="audio-file" className="text-caption text-fg-dim">Audio File</label>
+          <div className={cn('relative', isGenerating && 'opacity-50 pointer-events-none')}>
             <label className={cn(
-              'flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer',
-              'border-input hover:bg-accent hover:border-primary/50',
-              'transition-colors'
+              'flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl cursor-pointer',
+              'border-border-subtle hover:bg-bg-elevated hover:border-accent-warm/50',
+              'transition-all duration-200'
             )}>
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <Upload className="w-8 h-8 mb-3 text-muted-foreground" />
-                <p className="mb-2 text-sm text-muted-foreground">
-                  <span className="font-semibold">Click to upload</span> or drag and drop
+              <div className="flex flex-col items-center justify-center pt-6 pb-8">
+                <Upload className="h-10 w-10 mb-3 text-fg-dim" aria-hidden="true" />
+                <p className="mb-2 text-sm text-fg-muted">
+                  <span className="font-medium">Click to upload</span> or drag and drop
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-fg-dim">
                   WAV, MP3, M4A, FLAC, OGG, WebM, AAC (max 50MB)
                 </p>
                 {audioFile && (
-                  <p className="mt-2 text-sm font-medium text-primary">
+                  <p className="mt-3 text-sm font-medium text-accent-warm truncate max-w-[90%] flex items-center gap-2">
+                    <FileAudio className="h-4 w-4" aria-hidden="true" />
                     {audioFile.name}
                   </p>
                 )}
@@ -302,19 +272,44 @@ export function GenerationForm() {
                 onChange={handleFileChange}
                 className="hidden"
                 disabled={isGenerating}
+                aria-label="Upload audio file for transcription"
               />
             </label>
           </div>
         </div>
       )}
 
-      {error && (
-        <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span>{error}</span>
+      {/* Text Input (Speech mode only) */}
+      {mode === 'speech' && (
+        <div className="space-y-2">
+          <label htmlFor="text-input" className="text-caption text-fg-dim">Text to Generate</label>
+          <textarea
+            id="text-input"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Enter text to convert to speech (max 20,000 characters)..."
+            rows={6}
+            className={cn(
+              'input-field font-sans resize-y',
+              isOverLimit && 'input-field-error',
+              isGenerating && 'opacity-50'
+            )}
+            disabled={isGenerating}
+            maxLength={maxChars}
+            aria-describedby="char-count"
+          />
+          <div className="flex justify-between text-caption">
+            <span className="text-fg-muted" id="char-count">
+              {charCount.toLocaleString()} / {maxChars.toLocaleString()} characters
+            </span>
+            {isOverLimit && (
+              <span className="text-red-400 font-medium">Over limit</span>
+            )}
+          </div>
         </div>
       )}
 
+      {/* Submit Button */}
       <button
         type="submit"
         disabled={
@@ -325,28 +320,29 @@ export function GenerationForm() {
           (mode === 'transcribe' && !audioFile)
         }
         className={cn(
-          'w-full py-3 px-6 rounded-lg font-medium text-base transition-colors',
+          'w-full py-3.5 px-6 rounded-lg font-medium text-base transition-all duration-150',
           'flex items-center justify-center gap-2',
-          'disabled:opacity-50 disabled:cursor-not-allowed',
+          'disabled:opacity-40 disabled:cursor-not-allowed',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep',
           isGenerating
-            ? 'bg-primary/50 text-primary-foreground'
-            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+            ? 'bg-accent-warm/50 text-bg-deep cursor-wait'
+            : 'bg-accent-warm text-bg-deep hover:bg-accent-warm-dim active:bg-accent-warm/80 shadow-[0_0_24px_rgba(212,168,67,0.3)]'
         )}
       >
         {isGenerating ? (
           <>
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Generating...
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+            <span>Generating...</span>
           </>
         ) : mode === 'speech' ? (
           <>
-            <Mic className="h-5 w-5" />
-            Generate Speech
+            <Mic className="h-5 w-5" aria-hidden="true" />
+            <span>Generate Speech</span>
           </>
         ) : (
           <>
-            <FileAudio className="h-5 w-5" />
-            Transcribe Audio
+            <FileAudio className="h-5 w-5" aria-hidden="true" />
+            <span>Transcribe Audio</span>
           </>
         )}
       </button>

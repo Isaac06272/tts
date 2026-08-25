@@ -30,17 +30,17 @@ export function AudioPlayer({ audioUrl, transcriptUrl, onTimeUpdate, className }
 
     const wavesurfer = WaveSurfer.create({
       container: containerRef.current,
-      waveColor: 'hsl(var(--primary))',
-      progressColor: 'hsl(var(--primary))',
-      cursorColor: 'hsl(var(--primary))',
-      barWidth: 2,
-      barGap: 1,
+      waveColor: 'hsl(var(--border-subtle))',
+      progressColor: 'hsl(var(--accent-cyan))',
+      cursorColor: 'hsl(var(--accent-warm))',
+      barWidth: 3,
+      barGap: 2,
       barRadius: 2,
-      height: 80,
+      height: 96,
       interact: true,
       normalize: true,
       url: audioUrl,
-      backend: 'WebAudio', // Use WebAudio backend for better performance
+      backend: 'WebAudio',
     });
 
     wavesurferRef.current = wavesurfer;
@@ -56,264 +56,193 @@ export function AudioPlayer({ audioUrl, transcriptUrl, onTimeUpdate, className }
       setIsLoading(false);
     });
 
-    wavesurfer.on('audioprocess', () => {
-      const time = wavesurfer.getCurrentTime();
-      setCurrentTime(time);
-      onTimeUpdate?.(time);
-    });
-
-    wavesurfer.on('finish', () => {
-      setIsPlaying(false);
-    });
-
     return () => {
       wavesurfer.destroy();
       wavesurferRef.current = null;
-      setWaveformReady(false);
     };
-  }, [audioUrl, onTimeUpdate]);
+  }, [audioUrl]);
 
-  // Create HTML5 audio element for actual playback
+  // Create hidden audio element for playback and sync
   useEffect(() => {
+    if (audioRef.current) return;
+
     const audio = new Audio(audioUrl);
-    // Assign to ref for external control (e.g., TranscriptViewer)
     audioRef.current = audio;
 
-    audio.addEventListener('play', () => setIsPlaying(true));
-    audio.addEventListener('pause', () => setIsPlaying(false));
-    audio.addEventListener('ended', () => setIsPlaying(false));
     audio.addEventListener('timeupdate', () => {
       setCurrentTime(audio.currentTime);
+      if (wavesurferRef.current) {
+        wavesurferRef.current.seekTo(audio.currentTime / audio.duration);
+      }
       onTimeUpdate?.(audio.currentTime);
     });
-    audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
-    audio.addEventListener('waiting', () => setIsLoading(true));
-    audio.addEventListener('canplay', () => setIsLoading(false));
 
-    audio.volume = isMuted ? 0 : volume;
+    audio.addEventListener('ended', () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+      if (wavesurferRef.current) {
+        wavesurferRef.current.seekTo(0);
+      }
+    });
 
-    // Sync WaveSurfer with audio element
-    const wavesurfer = wavesurferRef.current;
-    if (wavesurfer) {
-      wavesurfer.setMuted(isMuted);
-      wavesurfer.setVolume(volume);
-    }
+    audio.addEventListener('loadedmetadata', () => {
+      setDuration(audio.duration);
+    });
+
+    audio.addEventListener('error', () => {
+      setIsLoading(false);
+    });
 
     return () => {
       audio.pause();
       audio.src = '';
-      // Clear ref on cleanup
-      if (audioRef.current === audio) {
-        audioRef.current = null;
-      }
+      audioRef.current = null;
     };
-  }, [audioUrl, volume, isMuted]);
-
-  // Sync WaveSurfer with audio element on seek
-  useEffect(() => {
-    const wavesurfer = wavesurferRef.current;
-    const audio = audioRef.current;
-    if (!wavesurfer || !audio) return;
-
-    const handleWaveSurferSeek = (progress: number) => {
-      audio.currentTime = progress * audio.duration;
-    };
-
-    wavesurfer.on('seek' as any, handleWaveSurferSeek);
-
-    return () => {
-      wavesurfer.un('seek' as any, handleWaveSurferSeek);
-    };
-  }, [audioUrl]);
+  }, [audioUrl, onTimeUpdate]);
 
   const togglePlay = useCallback(() => {
-    const audio = audioRef.current;
-    const wavesurfer = wavesurferRef.current;
-    if (!audio) return;
-
+    if (!audioRef.current) return;
     if (isPlaying) {
-      audio.pause();
-      wavesurfer?.pause();
+      audioRef.current.pause();
+      setIsPlaying(false);
     } else {
-      audio.play().catch(console.error);
-      wavesurfer?.play();
+      audioRef.current.play().catch(console.error);
+      setIsPlaying(true);
     }
   }, [isPlaying]);
 
-  const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const audio = audioRef.current;
-    const wavesurfer = wavesurferRef.current;
-    if (!audio) return;
+  const seek = useCallback((time: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.currentTime = time;
+    setCurrentTime(time);
+    if (wavesurferRef.current) {
+      wavesurferRef.current.seekTo(time / duration);
+    }
+  }, [duration]);
 
-    const time = parseFloat(e.target.value);
-    audio.currentTime = time;
-    wavesurfer?.seekTo(time / audio.duration);
+  const skip = useCallback((seconds: number) => {
+    if (!audioRef.current) return;
+    const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
+    seek(newTime);
+  }, [currentTime, duration, seek]);
+
+  const handleVolumeChange = useCallback((value: number) => {
+    if (!audioRef.current) return;
+    audioRef.current.volume = value;
+    setVolume(value);
+    setIsMuted(value === 0);
   }, []);
 
-  const handleSkip = useCallback((seconds: number) => {
-    const audio = audioRef.current;
-    const wavesurfer = wavesurferRef.current;
-    if (!audio) return;
-
-    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
-    wavesurfer?.seekTo(audio.currentTime / audio.duration);
-  }, []);
-
-  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const audio = audioRef.current;
-    const vol = parseFloat(e.target.value);
-    setVolume(vol);
-    setIsMuted(vol === 0);
-    if (audio) audio.volume = vol;
-    wavesurferRef.current?.setVolume(vol);
-    wavesurferRef.current?.setMuted(vol === 0);
-  }, []);
-
-  const handleMuteToggle = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    setIsMuted(!isMuted);
-    audio.volume = isMuted ? volume : 0;
-    wavesurferRef.current?.setMuted(isMuted);
-    wavesurferRef.current?.setVolume(isMuted ? 0 : volume);
+  const toggleMute = useCallback(() => {
+    if (!audioRef.current) return;
+    if (isMuted) {
+      audioRef.current.volume = volume;
+      setIsMuted(false);
+    } else {
+      audioRef.current.volume = 0;
+      setIsMuted(true);
+    }
   }, [isMuted, volume]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      switch (e.key) {
-        case ' ':
-        case 'k':
-          e.preventDefault();
-          togglePlay();
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          handleSkip(-5);
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          handleSkip(5);
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          handleVolumeChange({ target: { value: String(Math.min(1, volume + 0.1)) } } as any);
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          handleVolumeChange({ target: { value: String(Math.max(0, volume - 0.1)) } } as any);
-          break;
-        case 'm':
-          e.preventDefault();
-          handleMuteToggle();
-          break;
-      }
-    },
-    [togglePlay, handleSkip, handleVolumeChange, handleMuteToggle, volume]
-  );
+  // Waveform click to seek
+  const handleWaveformClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!wavesurferRef.current || !duration) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const progress = (e.clientX - rect.left) / rect.width;
+    const time = progress * duration;
+    seek(time);
+  }, [duration, seek]);
 
   return (
-    <div
-      className={cn('w-full', className)}
-      onKeyDown={handleKeyDown}
-      tabIndex={0}
-      role="region"
-      aria-label="Audio player"
-    >
+    <div className={cn('space-y-5', className)}>
       {/* Waveform */}
       <div
         ref={containerRef}
-        className={cn(
-          'wavesurfer-container relative',
-          isLoading && 'animate-pulse'
-        )}
-        role="img"
-        aria-label="Audio waveform"
-      >
-        {isLoading && !waveformReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
-      </div>
+        className="wavesurfer-container cursor-pointer rounded-lg"
+        onClick={handleWaveformClick}
+        role="slider"
+        aria-label="Playback progress"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration)}
+        aria-valuenow={Math.round(currentTime)}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowRight') skip(5);
+          else if (e.key === 'ArrowLeft') skip(-5);
+          else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+        }}
+      />
 
       {/* Controls */}
-      <div className="flex items-center gap-4 mt-4">
-        {/* Time / Progress */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <span className="text-sm font-mono text-muted-foreground w-16 text-right">
-            {formatTime(currentTime)}
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={duration || 100}
-            value={currentTime}
-            onChange={handleSeek}
-            className="flex-1 h-2 bg-muted appearance-none rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background [&::-webkit-slider-thumb]:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-            aria-label="Seek"
-          />
-          <span className="text-sm font-mono text-muted-foreground w-16">
-            {formatTime(duration)}
-          </span>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 text-caption text-fg-muted min-w-[90px] font-mono tabular-nums">
+          {formatTime(currentTime)}
         </div>
 
-        {/* Playback Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <button
-            onClick={() => handleSkip(-10)}
-            className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-            aria-label="Skip back 10 seconds"
+            onClick={() => skip(-5)}
+            className="p-2 rounded-lg text-fg-muted hover:text-fg-primary hover:bg-bg-elevated transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep"
+            aria-label="Rewind 5 seconds"
+            disabled={isLoading}
           >
-            <SkipBack className="h-5 w-5" />
+            <SkipBack className="h-5 w-5" aria-hidden="true" />
           </button>
 
           <button
             onClick={togglePlay}
-            disabled={isLoading}
-            className="p-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="p-3 rounded-full bg-accent-warm text-bg-deep hover:bg-accent-warm-dim active:bg-accent-warm/80 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-warm focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep shadow-[0_0_16px_rgba(212,168,67,0.3)]"
             aria-label={isPlaying ? 'Pause' : 'Play'}
+            disabled={isLoading}
           >
-            {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+            ) : isPlaying ? (
+              <Pause className="h-6 w-6" aria-hidden="true" />
+            ) : (
+              <Play className="h-6 w-6 ml-1" aria-hidden="true" />
+            )}
           </button>
 
           <button
-            onClick={() => handleSkip(10)}
-            className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-            aria-label="Skip forward 10 seconds"
+            onClick={() => skip(5)}
+            className="p-2 rounded-lg text-fg-muted hover:text-fg-primary hover:bg-bg-elevated transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep"
+            aria-label="Forward 5 seconds"
+            disabled={isLoading}
           >
-            <SkipForward className="h-5 w-5" />
+            <SkipForward className="h-5 w-5" aria-hidden="true" />
           </button>
+        </div>
+
+        <div className="flex items-center gap-2 text-caption text-fg-muted min-w-[90px] text-right font-mono tabular-nums">
+          {formatTime(duration)}
         </div>
 
         {/* Volume */}
         <div className="flex items-center gap-2">
           <button
-            onClick={handleMuteToggle}
-            className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+            onClick={toggleMute}
+            className="p-2 rounded-lg text-fg-muted hover:text-fg-primary hover:bg-bg-elevated transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep"
             aria-label={isMuted ? 'Unmute' : 'Mute'}
           >
-            {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+            {isMuted || volume === 0 ? (
+              <VolumeX className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Volume2 className="h-5 w-5" aria-hidden="true" />
+            )}
           </button>
           <input
             type="range"
-            min={0}
-            max={1}
-            step={0.1}
+            min="0"
+            max="1"
+            step="0.1"
             value={isMuted ? 0 : volume}
-            onChange={handleVolumeChange}
-            className="w-24 h-2 bg-muted appearance-none rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+            onChange={(e) => handleVolumeChange(Number(e.target.value))}
+            className="w-28 h-1.5 appearance-none bg-border-subtle rounded-full accent-accent-cyan cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep"
             aria-label="Volume"
           />
         </div>
-      </div>
-
-      {/* Keyboard shortcuts hint */}
-      <div className="mt-3 text-xs text-muted-foreground flex flex-wrap gap-4">
-        <kbd className="px-1.5 py-0.5 bg-muted rounded border">Space/K</kbd> Play/Pause
-        <kbd className="px-1.5 py-0.5 bg-muted rounded border">←/→</kbd> Seek ±5s
-        <kbd className="px-1.5 py-0.5 bg-muted rounded border">↑/↓</kbd> Volume
-        <kbd className="px-1.5 py-0.5 bg-muted rounded border">M</kbd> Mute
       </div>
     </div>
   );

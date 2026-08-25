@@ -1,8 +1,8 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { History, Loader2, Sparkles } from 'lucide-react';
-import { cn, formatTime } from '@/lib/utils';
+import { History, Loader2, Sparkles, Mic, FileAudio, Upload, Copy, Download, FileText, Search, ChevronDown, Globe, User, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Trash2, Clock } from 'lucide-react';
+import { cn, formatTime, formatDate, copyToClipboard, downloadBlob } from '@/lib/utils';
 import { GenerationForm } from '@/components/GenerationForm';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { TranscriptViewer } from '@/components/TranscriptViewer';
@@ -11,6 +11,148 @@ import { useGenerationStore } from '@/store/useGenerationStore';
 import { api } from '@/lib/api';
 import type { GenerationDetail, GenerationHistoryItem, TranscriptOutput } from '@/types';
 
+function GenerateView({
+  current,
+  transcript,
+  audioRef,
+  isTranscriptOnly,
+  handleNewGeneration,
+  onViewHistory,
+}: {
+  current: GenerationDetail | null;
+  transcript: TranscriptOutput | null;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
+  isTranscriptOnly: boolean;
+  handleNewGeneration: () => void;
+  onViewHistory: () => void;
+}) {
+  if (!current) return null;
+
+  return (
+    <section aria-labelledby="player-heading" className="space-y-6">
+      <header className="flex items-center justify-between">
+        <h2 id="player-heading" className="text-h3 text-accent-warm">
+          {isTranscriptOnly ? 'Transcript' : 'Playback'}
+        </h2>
+      </header>
+
+      <div className="grid lg:grid-cols-12 gap-6">
+        {!isTranscriptOnly && (
+          <div className="lg:col-span-8 space-y-6">
+            <div className="surface-elevated p-6">
+              <AudioPlayer audioUrl={current.audio_url} transcriptUrl={current.transcript_url} />
+            </div>
+
+            <div className="surface-elevated p-6">
+              <TranscriptViewer
+                transcriptUrl={current.transcript_url}
+                transcriptData={transcript}
+                audioRef={audioRef}
+                fullText={current.text}
+              />
+            </div>
+          </div>
+        )}
+
+        {isTranscriptOnly && (
+          <div className="lg:col-span-12">
+            <div className="surface-elevated p-6">
+              <TranscriptViewer
+                transcriptUrl={current.transcript_url}
+                transcriptData={transcript}
+                audioRef={audioRef}
+                fullText={current.text}
+              />
+            </div>
+          </div>
+        )}
+
+        <aside className="lg:col-span-4 space-y-6" aria-label="Generation info">
+          <div className="surface-panel p-6">
+            <h3 className="text-caption text-fg-dim mb-4">Generation Info</h3>
+            <dl className="space-y-4 text-sm">
+              <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                <dt className="text-fg-muted whitespace-nowrap">
+                  {isTranscriptOnly ? 'Mode' : 'Voice'}
+                </dt>
+                <dd className="text-fg-primary font-medium text-right break-all font-mono text-xs">
+                  {isTranscriptOnly
+                    ? 'Audio Transcription'
+                    : current.voice_id.replace('Neural', '')}
+                </dd>
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                <dt className="text-fg-muted whitespace-nowrap">Duration</dt>
+                <dd className="text-fg-primary font-medium text-right font-mono">
+                  {current.duration ? formatTime(current.duration) : '—'}
+                </dd>
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                <dt className="text-fg-muted whitespace-nowrap">Created</dt>
+                <dd className="text-fg-primary font-medium text-right font-mono">
+                  {formatDate(current.created_at)}
+                </dd>
+              </div>
+              {!isTranscriptOnly && current.text && (
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <dt className="text-fg-muted whitespace-nowrap">Characters</dt>
+                  <dd className="text-fg-primary font-medium text-right font-mono">
+                    {current.text.length.toLocaleString()}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          <div className="surface-panel p-6 space-y-3">
+            <button
+              onClick={handleNewGeneration}
+              className="w-full btn-primary"
+            >
+              New Generation
+            </button>
+            <button
+              onClick={onViewHistory}
+              className="w-full btn-secondary"
+            >
+              View History
+            </button>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function HistoryView({
+  handleNewGeneration,
+  onLoadGeneration,
+}: {
+  handleNewGeneration: () => void;
+  onLoadGeneration: (generation: GenerationHistoryItem) => void;
+}) {
+  return (
+    <section aria-labelledby="history-heading" className="max-w-4xl mx-auto">
+      <header className="flex items-center justify-between mb-8">
+        <div>
+          <h2 id="history-heading" className="text-h1 text-accent-warm">History</h2>
+          <p className="text-fg-muted text-body mt-2">Previous generations and transcriptions</p>
+        </div>
+        <button
+          onClick={handleNewGeneration}
+          className="btn-primary gap-2"
+        >
+          <Sparkles className="h-5 w-5" aria-hidden="true" />
+          New Generation
+        </button>
+      </header>
+      <div className="surface-elevated overflow-hidden">
+        <HistoryList onLoadGeneration={onLoadGeneration} />
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   const { current, setCurrent, clearError } = useGenerationStore();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -18,20 +160,15 @@ export default function HomePage() {
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
 
-  // Check if current generation is transcript-only (no audio)
   const isTranscriptOnly = current?.voice_id === 'transcript-only' || !current?.audio_url;
-
-  // Check if it's a local transcript (stored in sessionStorage)
   const isLocalTranscript = current?.id.startsWith('transcript-') || current?.id.startsWith('transcribe-');
 
-  // Fetch transcript when generation changes
   useEffect(() => {
     if (!current) {
       setTranscript(null);
       return;
     }
 
-    // For local transcripts (both transcript-only and transcribed audio), read from sessionStorage
     if (isTranscriptOnly && isLocalTranscript) {
       try {
         const stored = sessionStorage.getItem(`transcript-${current.id}`);
@@ -63,7 +200,6 @@ export default function HomePage() {
     clearError();
     setActiveTab('generate');
     try {
-      // Check if it's a local transcript generation (both transcript-only and transcribed audio)
       const isLocal = generation.id.startsWith('transcript-') || generation.id.startsWith('transcribe-');
       if (isLocal) {
         const stored = sessionStorage.getItem(`transcript-${generation.id}`);
@@ -86,184 +222,105 @@ export default function HomePage() {
     }
   };
 
+  const handleNewGeneration = () => {
+    clearError();
+    setCurrent(null);
+    setTranscript(null);
+    setActiveTab('generate');
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Sparkles className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">TTS App</h1>
-                <p className="text-xs text-muted-foreground">Edge-TTS + faster-whisper</p>
-              </div>
+    <div className="min-h-screen bg-bg-deep flex flex-col">
+      {/* Header with Waveform Ribbon */}
+      <header className="sticky top-0 z-50 border-b border-border-subtle bg-bg-panel/95 backdrop-blur supports-[backdrop-filter]:bg-bg-panel/80">
+        {/* Waveform Ribbon */}
+        <div className="waveform-ribbon" aria-hidden="true" />
+
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-accent-warm/15 rounded-lg">
+              <Sparkles className="h-5 w-5 text-accent-warm" aria-hidden="true" />
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setActiveTab('history')}
-                className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                  activeTab === 'history'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                )}
-              >
-                <History className="h-4 w-4 inline-block mr-1" />
-                History
-              </button>
+            <div>
+              <h1 className="text-h3 font-extrabold text-accent-warm">TTS Studio</h1>
+              <p className="text-caption text-fg-dim">Edge-TTS + faster-whisper</p>
             </div>
           </div>
+          <nav className="flex items-center gap-1" role="tablist" aria-label="Main navigation">
+            <button
+              role="tab"
+              aria-selected={activeTab === 'generate'}
+              aria-controls="generate-panel"
+              id="generate-tab"
+              onClick={() => { setActiveTab('generate'); handleNewGeneration(); }}
+              className={cn(
+                'px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep',
+                activeTab === 'generate'
+                  ? 'bg-accent-warm text-bg-deep shadow-[0_0_16px_rgba(212,168,67,0.3)]'
+                  : 'text-fg-muted hover:text-fg-primary hover:bg-bg-elevated'
+              )}
+            >
+              Generate
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'history'}
+              aria-controls="history-panel"
+              id="history-tab"
+              onClick={() => setActiveTab('history')}
+              className={cn(
+                'px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep',
+                activeTab === 'history'
+                  ? 'bg-accent-warm text-bg-deep shadow-[0_0_16px_rgba(212,168,67,0.3)]'
+                  : 'text-fg-muted hover:text-fg-primary hover:bg-bg-elevated'
+              )}
+            >
+              <History className="h-4 w-4 mr-1.5 inline-block" aria-hidden="true" />
+              History
+            </button>
+          </nav>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-8 lg:py-12" role="tabpanel" id={activeTab === 'generate' ? 'generate-panel' : 'history-panel'}>
         {activeTab === 'generate' ? (
-          <div className="max-w-4xl mx-auto space-y-8">
+          <div className="max-w-7xl mx-auto space-y-8">
             {/* Generation Form */}
-            <section aria-labelledby="generate-heading">
-              <h2 id="generate-heading" className="text-2xl font-bold mb-6">
-                {isTranscriptOnly ? 'Transcript Generator' : 'Generate Speech'}
-              </h2>
-              <div className="bg-card border rounded-xl p-6 shadow-sm">
+            <section aria-labelledby="generate-heading" className="space-y-6">
+              <header>
+                <h2 id="generate-heading" className="text-h1 text-accent-warm">
+                  {isTranscriptOnly ? 'Transcribe Audio' : 'Generate Speech'}
+                </h2>
+                <p className="text-fg-muted text-body-lg mt-2">
+                  {isTranscriptOnly
+                    ? 'Upload an audio file to transcribe with sentence-level timestamps'
+                    : 'Convert text to natural-sounding speech with word-level timestamps'}
+                </p>
+              </header>
+              <div className="surface-panel p-6 md:p-8">
                 <GenerationForm />
               </div>
             </section>
 
-            {/* Player & Transcript */}
-            {current && (
-              <section aria-labelledby="player-heading" className="space-y-6">
-                <h2 id="player-heading" className="text-2xl font-bold">
-                  {isTranscriptOnly ? 'Transcript' : 'Playback'}
-                </h2>
-
-                <div className="grid lg:grid-cols-3 gap-6">
-                  {/* Audio Player (only show if not transcript-only) */}
-                  {!isTranscriptOnly && (
-                    <div className="lg:col-span-2 space-y-6">
-                      <div className="bg-card border rounded-xl p-6 shadow-sm">
-                        <AudioPlayer
-                          audioUrl={current.audio_url}
-                          transcriptUrl={current.transcript_url}
-                        />
-                      </div>
-
-                      {/* Transcript */}
-                      <div className="bg-card border rounded-xl p-6 shadow-sm">
-                        <TranscriptViewer
-                          transcriptUrl={current.transcript_url}
-                          audioRef={audioRef}
-                          fullText={current.text}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Transcript-only or Transcript with audio */}
-                  {isTranscriptOnly && (
-                    <div className="lg:col-span-3">
-                      <div className="bg-card border rounded-xl p-6 shadow-sm">
-                        <TranscriptViewer
-                          transcriptUrl={current.transcript_url}
-                          transcriptData={transcript}
-                          audioRef={audioRef}
-                          fullText={current.text}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Info Panel */}
-                  <div className={cn('space-y-4', isTranscriptOnly ? 'lg:col-span-3' : '')}>
-                    <div className="bg-card border rounded-xl p-6 shadow-sm">
-                      <h3 className="font-semibold mb-4">Generation Info</h3>
-                      <dl className="space-y-3 text-sm">
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">
-                            {isTranscriptOnly ? 'Mode' : 'Voice'}
-                          </dt>
-                          <dd className="font-medium">
-                            {isTranscriptOnly
-                              ? 'Transcript Only'
-                              : current.voice_id.replace('Neural', '')}
-                          </dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Created</dt>
-                          <dd className="font-medium">
-                            {new Date(current.created_at).toLocaleString()}
-                          </dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Duration</dt>
-                          <dd className="font-medium">
-                            {transcript ? formatTime(transcript.duration) : 'Loading...'}
-                          </dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Segments</dt>
-                          <dd className="font-medium">
-                            {transcript ? transcript.segments.length : 'Loading...'}
-                          </dd>
-                        </div>
-                        <div className="flex justify-between">
-                          <dt className="text-muted-foreground">Characters</dt>
-                          <dd className="font-medium">{current.text.length}</dd>
-                        </div>
-                      </dl>
-                    </div>
-
-                    {/* Original Text */}
-                    <div className="bg-card border rounded-xl p-6 shadow-sm">
-                      <h3 className="font-semibold mb-3">Original Text</h3>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap max-h-64 overflow-y-auto">
-                        {current.text}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* Empty State */}
-            {!current && (
-              <div className="text-center py-16 text-muted-foreground">
-                <Sparkles className="h-16 w-16 mx-auto mb-4 opacity-30" />
-                <p className="text-lg">Enter text and click Generate to get started</p>
-                <p className="text-sm mt-1">
-                  Choose between generating speech with transcript or transcript only
-                </p>
-              </div>
-            )}
+            <GenerateView
+              current={current}
+              transcript={transcript}
+              audioRef={audioRef}
+              isTranscriptOnly={isTranscriptOnly}
+              handleNewGeneration={handleNewGeneration}
+              onViewHistory={() => setActiveTab('history')}
+            />
           </div>
         ) : (
-          /* History Tab */
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Generation History</h2>
-              <button
-                onClick={() => setActiveTab('generate')}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-              >
-                ← Back to Generate
-              </button>
-            </div>
-            <div className="bg-card border rounded-xl p-6 shadow-sm">
-              <HistoryList onLoadGeneration={handleLoadFromHistory} />
-            </div>
-          </div>
+          <HistoryView
+            handleNewGeneration={handleNewGeneration}
+            onLoadGeneration={handleLoadFromHistory}
+          />
         )}
       </main>
-
-      {/* Footer */}
-      <footer className="border-t py-6 mt-12">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>Built with Next.js, FastAPI, Edge-TTS & faster-whisper</p>
-        </div>
-      </footer>
     </div>
   );
 }

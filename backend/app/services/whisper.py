@@ -22,6 +22,16 @@ def get_whisper_model() -> WhisperModel:
     return _model
 
 
+def _format_timestamp(seconds: float) -> str:
+    """Format seconds as [MM:SS] or [HH:MM:SS] if over an hour."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    if hours > 0:
+        return f"[{hours:02d}:{minutes:02d}:{secs:02d}]"
+    return f"[{minutes:02d}:{secs:02d}]"
+
+
 def _split_into_sentences(text: str) -> List[str]:
     """Split text into sentences, preserving punctuation."""
     # Split on sentence-ending punctuation followed by whitespace
@@ -44,7 +54,6 @@ def _segment_by_sentences(words: List, full_text: str) -> List[SegmentTimestamp]
 
     segments = []
     word_idx = 0
-    current_sentence = ""
 
     for sentence in sentences:
         sentence_words = sentence.split()
@@ -92,8 +101,11 @@ def _segment_by_sentences(words: List, full_text: str) -> List[SegmentTimestamp]
             sentence_end = words[word_idx - 1].end
 
         if sentence_start is not None and sentence_end is not None:
+            # Include timestamp in the segment text for the requested format
+            timestamp = _format_timestamp(sentence_start)
+            text_with_timestamp = f"{timestamp} {sentence}"
             segments.append(SegmentTimestamp(
-                text=sentence,
+                text=text_with_timestamp,
                 start=round(sentence_start, 2),
                 end=round(sentence_end, 2)
             ))
@@ -104,41 +116,31 @@ def _segment_by_sentences(words: List, full_text: str) -> List[SegmentTimestamp]
 async def transcribe_audio(audio_path: Path) -> List[SegmentTimestamp]:
     """
     Transcribe audio using faster-whisper with word-level timestamps,
-    then re-segment into sentence-level segments for accurate timing.
-
-    Args:
-        audio_path: Path to the audio file
-
-    Returns:
-        List of SegmentTimestamp objects with text, start, end per sentence
+    then re-segment into sentence-level segments for accurate alignment.
     """
     model = get_whisper_model()
 
-    # Run transcription in thread pool to avoid blocking
-    import asyncio
-    loop = asyncio.get_event_loop()
+    # Transcribe with word-level timestamps
+    segments, info = model.transcribe(
+        str(audio_path),
+        word_timestamps=True,
+        language=None,  # Auto-detect
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=500),
+    )
 
-    def _transcribe():
-        # Use word_timestamps=True to get precise word-level timing
-        segments, info = model.transcribe(
-            str(audio_path),
-            word_timestamps=True,
-            vad_filter=True,
-        )
+    # Collect all words with timestamps
+    all_words = []
+    full_text_parts = []
 
-        all_words = []
-        full_text_parts = []
+    for segment in segments:
+        full_text_parts.append(segment.text.strip())
+        if segment.words:
+            all_words.extend(segment.words)
 
-        for segment in segments:
-            full_text_parts.append(segment.text.strip())
-            if segment.words:
-                for word in segment.words:
-                    all_words.append(word)
+    full_text = " ".join(full_text_parts).strip()
 
-        full_text = " ".join(full_text_parts)
+    # Re-segment by sentences using word timestamps
+    sentence_segments = _segment_by_sentences(all_words, full_text)
 
-        # Re-segment by sentences using word timestamps for accuracy
-        return _segment_by_sentences(all_words, full_text)
-
-    segments = await loop.run_in_executor(None, _transcribe)
-    return segments
+    return sentence_segments
