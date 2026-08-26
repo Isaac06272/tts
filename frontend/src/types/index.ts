@@ -34,6 +34,7 @@ export interface TranscriptOnlyRequest {
 export interface TranscribeAudioResponse {
   transcript: TranscriptOutput;
   filename: string;
+  generation_id: string;
 }
 
 export interface GenerateResponse {

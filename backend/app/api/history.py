@@ -35,7 +35,7 @@ async def get_history(
     items = [
         GenerationHistoryItem(
             id=g.id,
-            audio_url=f"/static/outputs/{g.id}.mp3",
+            audio_url=f"/static/outputs/{g.id}.mp3" if g.audio_path else "",
             transcript_url=f"/static/outputs/{g.id}.json",
             created_at=g.created_at,
             voice_id=g.voice_id,
@@ -65,7 +65,7 @@ async def get_generation(
 
     return GenerationDetail(
         id=generation.id,
-        audio_url=f"/static/outputs/{generation.id}.mp3",
+        audio_url=f"/static/outputs/{generation.id}.mp3" if generation.audio_path else "",
         transcript_url=f"/static/outputs/{generation.id}.json",
         created_at=generation.created_at,
         voice_id=generation.voice_id,
@@ -93,9 +93,9 @@ async def delete_generation(
     # Delete files
     import os
     try:
-        if os.path.exists(generation.audio_path):
+        if generation.audio_path and os.path.exists(generation.audio_path):
             os.unlink(generation.audio_path)
-        if os.path.exists(generation.transcript_path):
+        if generation.transcript_path and os.path.exists(generation.transcript_path):
             os.unlink(generation.transcript_path)
     except OSError:
         pass  # Files might not exist, that's ok

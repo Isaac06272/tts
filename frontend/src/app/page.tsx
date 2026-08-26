@@ -160,8 +160,11 @@ export default function HomePage() {
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
 
-  const isTranscriptOnly = current?.voice_id === 'transcript-only' || !current?.audio_url;
+  const isTranscriptOnly = current?.voice_id === 'transcribed-audio' || current?.voice_id === 'transcript-only' || !current?.audio_url;
+  // Check if this is a local transcript (old format with transcript- or transcribe- prefix)
+  // or a database transcript (voice_id === 'transcribed-audio')
   const isLocalTranscript = current?.id.startsWith('transcript-') || current?.id.startsWith('transcribe-');
+  const isDbTranscript = current?.voice_id === 'transcribed-audio';
 
   useEffect(() => {
     if (!current) {
@@ -170,6 +173,7 @@ export default function HomePage() {
     }
 
     if (isTranscriptOnly && isLocalTranscript) {
+      // Old format: transcript stored in sessionStorage
       try {
         const stored = sessionStorage.getItem(`transcript-${current.id}`);
         if (stored) {
@@ -178,6 +182,23 @@ export default function HomePage() {
       } catch (error) {
         console.error('Failed to load transcript from sessionStorage:', error);
       }
+      return;
+    }
+
+    if (isTranscriptOnly && isDbTranscript) {
+      // New format: transcript from database, fetch from static file
+      const fetchTranscript = async () => {
+        setTranscriptLoading(true);
+        try {
+          const data = await api.getTranscript(current.transcript_url);
+          setTranscript(data);
+        } catch (error) {
+          console.error('Failed to fetch transcript:', error);
+        } finally {
+          setTranscriptLoading(false);
+        }
+      };
+      fetchTranscript();
       return;
     }
 
@@ -194,13 +215,15 @@ export default function HomePage() {
     };
 
     fetchTranscript();
-  }, [current, isTranscriptOnly, isLocalTranscript]);
+  }, [current, isTranscriptOnly, isLocalTranscript, isDbTranscript]);
 
   const handleLoadFromHistory = async (generation: GenerationHistoryItem) => {
     clearError();
     setActiveTab('generate');
     try {
       const isLocal = generation.id.startsWith('transcript-') || generation.id.startsWith('transcribe-');
+      const isDbTranscript = generation.voice_id === 'transcribed-audio';
+
       if (isLocal) {
         const stored = sessionStorage.getItem(`transcript-${generation.id}`);
         if (stored) {
@@ -215,6 +238,15 @@ export default function HomePage() {
         }
         return;
       }
+
+      if (isDbTranscript) {
+        // For database transcriptions, fetch the full detail
+        const detail = await api.getGeneration(generation.id);
+        setCurrent(detail);
+        // The transcript will be fetched in the useEffect
+        return;
+      }
+
       const detail = await api.getGeneration(generation.id);
       setCurrent(detail);
     } catch (error) {

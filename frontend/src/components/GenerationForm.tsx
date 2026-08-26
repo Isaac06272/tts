@@ -116,24 +116,24 @@ export function GenerationForm() {
     try {
       const response = await api.transcribeAudio(audioFile);
       const transcript = response.transcript;
+      const generationId = response.generation_id;
 
-      const transcriptId = `transcribe-${Date.now()}`;
       const virtualGeneration = {
-        id: transcriptId,
+        id: generationId,
         audio_url: '',
-        transcript_url: `/static/outputs/${transcriptId}.json`,
+        transcript_url: `/static/outputs/${generationId}.json`,
         created_at: new Date().toISOString(),
         voice_id: 'transcribed-audio',
         text: transcript.full_text,
         duration: transcript.duration,
       };
 
-      sessionStorage.setItem(`transcript-${transcriptId}`, JSON.stringify(transcript));
+      sessionStorage.setItem(`transcript-${generationId}`, JSON.stringify(transcript));
       setCurrent(virtualGeneration as any);
       addToHistory({
-        id: transcriptId,
+        id: generationId,
         audio_url: '',
-        transcript_url: `/static/outputs/${transcriptId}.json`,
+        transcript_url: `/static/outputs/${generationId}.json`,
         created_at: new Date().toISOString(),
         voice_id: 'transcribed-audio',
         text_preview: transcript.full_text.slice(0, 100) + (transcript.full_text.length > 100 ? '...' : ''),

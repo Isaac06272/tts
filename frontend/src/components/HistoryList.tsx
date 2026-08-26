@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Trash2, Play, Clock, Loader2, ChevronLeft, ChevronRight, FileText, Volume2 } from 'lucide-react';
 import { cn, formatDate, formatTime } from '@/lib/utils';
 import { useGenerationStore } from '@/store/useGenerationStore';
 import { useGenerations } from '@/hooks/useGenerations';
 import type { GenerationHistoryItem } from '@/types';
+
+type HistoryFilter = 'all' | 'speech' | 'transcription';
 
 interface HistoryListProps {
   onLoadGeneration: (generation: GenerationHistoryItem) => void;
@@ -23,6 +25,8 @@ export function HistoryList({ onLoadGeneration, className }: HistoryListProps) {
     loadMoreHistory,
     deleteGeneration,
   } = useGenerations();
+
+  const [filter, setFilter] = useState<HistoryFilter>('all');
 
   // Load initial history
   useEffect(() => {
@@ -43,7 +47,18 @@ export function HistoryList({ onLoadGeneration, className }: HistoryListProps) {
   };
 
   const isTranscriptOnly = (generation: GenerationHistoryItem) =>
-    generation.voice_id === 'transcript-only' || generation.id.startsWith('transcribe-');
+    generation.voice_id === 'transcript-only' ||
+    generation.voice_id === 'transcribed-audio' ||
+    generation.id.startsWith('transcribe-') ||
+    generation.id.startsWith('transcript-');
+
+  // Filter history based on selected filter
+  const filteredHistory = history.filter((generation) => {
+    if (filter === 'all') return true;
+    if (filter === 'speech') return !isTranscriptOnly(generation);
+    if (filter === 'transcription') return isTranscriptOnly(generation);
+    return true;
+  });
 
   if (isLoadingHistory && history.length === 0) {
     return (
@@ -55,97 +70,151 @@ export function HistoryList({ onLoadGeneration, className }: HistoryListProps) {
     );
   }
 
-  if (history.length === 0) {
+  if (filteredHistory.length === 0) {
     return (
       <div className={cn('text-center py-16 text-fg-muted', className)}>
         <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" aria-hidden="true" />
-        <p className="text-h3 font-medium text-fg-primary">No generations yet</p>
-        <p className="text-body mt-2">Generate your first speech or transcribe audio to see it here</p>
+        <p className="text-h3 font-medium text-fg-primary">
+          {filter === 'all' ? 'No generations yet' : filter === 'speech' ? 'No speech generations' : 'No transcriptions'}
+        </p>
+        <p className="text-body mt-2">
+          {filter === 'all'
+            ? 'Generate your first speech or transcribe audio to see it here'
+            : filter === 'speech'
+            ? 'Generate speech to see it here'
+            : 'Transcribe audio to see it here'}
+        </p>
       </div>
     );
   }
 
   return (
-    <div className={cn('divide-y divide-border-subtle', className)}>
-      {history.map((generation) => (
-        <article
-          key={generation.id}
-          className="p-4 card-interactive cursor-pointer"
-          onClick={() => handleLoad(generation)}
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleLoad(generation); } }}
-          role="button"
-          aria-label={`Load generation from ${formatDate(generation.created_at)}`}
+    <div className={cn('flex flex-col', className)}>
+      {/* Filter Tabs */}
+      <div className="flex gap-2 mb-4 p-1 surface-input rounded-lg">
+        <button
+          onClick={() => setFilter('all')}
+          className={cn(
+            'px-4 py-2 rounded-md text-sm font-medium transition-all',
+            filter === 'all'
+              ? 'bg-accent-warm text-bg-deep shadow-sm'
+              : 'text-fg-muted hover:text-fg-primary'
+          )}
         >
-          <div className="flex items-start gap-4">
-            {/* Icon / Type indicator */}
-            <div className={cn(
-              'flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center',
-              isTranscriptOnly(generation)
-                ? 'bg-accent-warm/15 text-accent-warm'
-                : 'bg-accent-cyan/15 text-accent-cyan'
-            )}>
-              {isTranscriptOnly(generation) ? (
-                <FileText className="h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Volume2 className="h-6 w-6" aria-hidden="true" />
-              )}
-            </div>
+          All
+        </button>
+        <button
+          onClick={() => setFilter('speech')}
+          className={cn(
+            'px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2',
+            filter === 'speech'
+              ? 'bg-accent-cyan text-bg-deep shadow-sm'
+              : 'text-fg-muted hover:text-fg-primary'
+          )}
+        >
+          <Volume2 className="h-4 w-4" aria-hidden="true" />
+          Speech
+        </button>
+        <button
+          onClick={() => setFilter('transcription')}
+          className={cn(
+            'px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2',
+            filter === 'transcription'
+              ? 'bg-accent-warm text-bg-deep shadow-sm'
+              : 'text-fg-muted hover:text-fg-primary'
+          )}
+        >
+          <FileText className="h-4 w-4" aria-hidden="true" />
+          Transcriptions
+        </button>
+      </div>
 
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-fg-primary truncate">
-                    {generation.text_preview}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3 mt-2 text-caption text-fg-dim">
-                    <span className="font-mono tabular-nums">{formatDate(generation.created_at)}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-bg-input text-[10px] font-medium uppercase tracking-wider">
-                      {isTranscriptOnly(generation) ? 'Transcription' : 'Speech'}
-                    </span>
-                    {!isTranscriptOnly(generation) && generation.voice_id && (
-                      <span className="truncate max-w-[150px]">{generation.voice_id.replace('Neural', '')}</span>
-                    )}
+      {/* Results Count */}
+      <p className="text-caption text-fg-dim mb-3">
+        Showing {filteredHistory.length} of {history.length} {history.length === 1 ? 'generation' : 'generations'}
+      </p>
+
+      <div className={cn('divide-y divide-border-subtle', className)}>
+        {filteredHistory.map((generation) => (
+          <article
+            key={generation.id}
+            className="p-4 card-interactive cursor-pointer group"
+            onClick={() => handleLoad(generation)}
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleLoad(generation); } }}
+            role="button"
+            aria-label={`Load generation from ${formatDate(generation.created_at)}`}
+          >
+            <div className="flex items-start gap-4">
+              {/* Icon / Type indicator */}
+              <div className={cn(
+                'flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center',
+                isTranscriptOnly(generation)
+                  ? 'bg-accent-warm/15 text-accent-warm'
+                  : 'bg-accent-cyan/15 text-accent-cyan'
+              )}>
+                {isTranscriptOnly(generation) ? (
+                  <FileText className="h-6 w-6" aria-hidden="true" />
+                ) : (
+                  <Volume2 className="h-6 w-6" aria-hidden="true" />
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-fg-primary truncate">
+                      {generation.text_preview}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 mt-2 text-caption text-fg-dim">
+                      <span className="font-mono tabular-nums">{formatDate(generation.created_at)}</span>
+                      <span className="px-2 py-0.5 rounded-full bg-bg-input text-[10px] font-medium uppercase tracking-wider">
+                        {isTranscriptOnly(generation) ? 'Transcription' : 'Speech'}
+                      </span>
+                      {!isTranscriptOnly(generation) && generation.voice_id && (
+                        <span className="truncate max-w-[150px]">{generation.voice_id.replace('Neural', '')}</span>
+                      )}
+                    </div>
                   </div>
+                  <Play className="h-5 w-5 text-fg-dim opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" aria-hidden="true" />
                 </div>
-                <Play className="h-5 w-5 text-fg-dim opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" aria-hidden="true" />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => handleDelete(generation.id, e)}
+                  className="p-2 rounded-lg text-fg-dim hover:text-red-400 hover:bg-red-500/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep"
+                  aria-label={`Delete generation from ${formatDate(generation.created_at)}`}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
               </div>
             </div>
+          </article>
+        ))}
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={(e) => handleDelete(generation.id, e)}
-                className="p-2 rounded-lg text-fg-dim hover:text-red-400 hover:bg-red-500/10 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep"
-                aria-label={`Delete generation from ${formatDate(generation.created_at)}`}
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
+        {/* Load More */}
+        {hasMoreHistory && (
+          <div className="p-4">
+            <button
+              onClick={loadMoreHistory}
+              disabled={isLoadingHistory}
+              className="w-full btn-secondary"
+            >
+              {isLoadingHistory ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2 inline-block" aria-hidden="true" />
+                  Loading...
+                </>
+              ) : (
+                `Load more ({history.length} of {historyTotal})`
+              )}
+            </button>
           </div>
-        </article>
-      ))}
-
-      {/* Load More */}
-      {hasMoreHistory && (
-        <div className="p-4">
-          <button
-            onClick={loadMoreHistory}
-            disabled={isLoadingHistory}
-            className="w-full btn-secondary"
-          >
-            {isLoadingHistory ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2 inline-block" aria-hidden="true" />
-                Loading...
-              </>
-            ) : (
-              `Load more ({history.length} of {historyTotal})`
-            )}
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -78,3 +78,4 @@ class TranscribeAudioRequest(BaseModel):
 class TranscribeAudioResponse(BaseModel):
     transcript: TranscriptOutput
     filename: str
+    generation_id: str

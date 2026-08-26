@@ -101,6 +101,7 @@ async def generate_speech(
 @router.post("/transcribe", response_model=TranscribeAudioResponse, status_code=status.HTTP_201_CREATED)
 async def transcribe_audio_file(
     file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
 ):
     """
     Transcribe an uploaded audio file using faster-whisper.
@@ -154,10 +155,24 @@ async def transcribe_audio_file(
         # Clean up temp audio file
         temp_audio_path.unlink(missing_ok=True)
 
-        # Return the transcript output
+        # Save to database
+        generation = Generation(
+            id=generation_id,
+            text=transcript.full_text,
+            voice_id="transcribed-audio",
+            audio_path="",  # No audio file for transcriptions
+            transcript_path=str(transcript_path),
+            duration=duration,
+        )
+        session.add(generation)
+        await session.commit()
+        await session.refresh(generation)
+
+        # Return the transcript output with generation_id
         return TranscribeAudioResponse(
             transcript=transcript,
-            filename=file.filename
+            filename=file.filename,
+            generation_id=str(generation.id)
         )
 
     except HTTPException:
