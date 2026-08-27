@@ -1,20 +1,21 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronDown, Search, Globe, User } from 'lucide-react';
+import { ChevronDown, Search, Globe, User, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { VoiceInfo } from '@/types';
+import type { VoiceInfo, CustomVoice } from '@/types';
 
 interface VoiceSelectorProps {
   id?: string;
   value: string;
   onChange: (voiceId: string) => void;
   voices: VoiceInfo[];
+  customVoices?: CustomVoice[];
   disabled?: boolean;
   className?: string;
 }
 
-export function VoiceSelector({ id, value, onChange, voices, disabled, className }: VoiceSelectorProps) {
+export function VoiceSelector({ id, value, onChange, voices, customVoices, disabled, className }: VoiceSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -32,7 +33,21 @@ export function VoiceSelector({ id, value, onChange, voices, disabled, className
     );
   }, [voices, searchQuery]);
 
+  const filteredCustomVoices = useMemo(() => {
+    if (!customVoices || customVoices.length === 0) return [];
+    if (!searchQuery) return customVoices.filter(v => v.is_active);
+    const query = searchQuery.toLowerCase();
+    return customVoices.filter(
+      v => v.is_active && (
+        v.name.toLowerCase().includes(query) ||
+        v.language.toLowerCase().includes(query) ||
+        v.description.toLowerCase().includes(query)
+      )
+    );
+  }, [customVoices, searchQuery]);
+
   const selectedVoice = voices.find((v) => v.id === value);
+  const selectedCustomVoice = customVoices?.find((v) => `custom-${v.id}` === value);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -81,17 +96,32 @@ export function VoiceSelector({ id, value, onChange, voices, disabled, className
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="flex flex-col min-w-0">
             <span className="font-medium truncate text-fg-primary">
-              {selectedVoice?.name || 'Select a voice'}
+              {selectedVoice?.name || selectedCustomVoice?.name || 'Select a voice'}
             </span>
-            {selectedVoice && (
+            {(selectedVoice || selectedCustomVoice) && (
               <span className="text-caption text-fg-dim truncate flex items-center gap-1">
-                <Globe className="h-3 w-3" aria-hidden="true" />
-                {selectedVoice.locale}
-                {selectedVoice.style && (
+                {selectedVoice ? (
                   <>
-                    <span aria-hidden="true">·</span>
-                    <User className="h-3 w-3" aria-hidden="true" />
-                    {selectedVoice.style}
+                    <Globe className="h-3 w-3" aria-hidden="true" />
+                    {selectedVoice.locale}
+                    {selectedVoice.style && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <User className="h-3 w-3" aria-hidden="true" />
+                        {selectedVoice.style}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Mic className="h-3 w-3" aria-hidden="true" />
+                    Custom Voice
+                    {selectedCustomVoice && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        {selectedCustomVoice.language.toUpperCase()}
+                      </>
+                    )}
                   </>
                 )}
               </span>
@@ -132,47 +162,111 @@ export function VoiceSelector({ id, value, onChange, voices, disabled, className
 
           {/* Voice List */}
           <div className="py-2" role="presentation">
-            {filteredVoices.length === 0 ? (
-              <div className="px-4 py-8 text-center text-fg-dim text-sm">
-                No voices match "{searchQuery}"
-              </div>
-            ) : (
-              filteredVoices.map((voice) => (
-                <button
-                  key={voice.id}
-                  type="button"
-                  onClick={() => { onChange(voice.id); setIsOpen(false); }}
-                  disabled={disabled}
-                  role="option"
-                  aria-selected={value === voice.id}
-                  className={cn(
-                    'w-full px-4 py-3 text-left transition-all duration-100',
-                    'hover:bg-bg-elevated hover:text-fg-primary',
-                    'focus-visible:outline-none focus-visible:bg-bg-elevated focus-visible:text-fg-primary',
-                    value === voice.id && 'bg-accent-warm/10 text-accent-warm'
-                  )}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="font-medium truncate">{voice.name}</span>
-                      <span className="text-caption text-fg-dim flex items-center gap-1 truncate">
-                        <Globe className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-                        {voice.locale}
-                        {voice.style && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <User className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-                            {voice.style}
-                          </>
-                        )}
-                      </span>
-                    </div>
-                    {value === voice.id && (
-                      <span className="text-accent-cyan" aria-hidden="true">✓</span>
-                    )}
+            {/* Edge-TTS Voices Section */}
+            {voices.length > 0 && (
+              <>
+                <div className="px-4 py-2 text-xs font-semibold text-fg-dim uppercase tracking-wider border-b border-border-subtle">
+                  Edge-TTS Voices
+                </div>
+                {filteredVoices.length === 0 ? (
+                  <div className="px-4 py-4 text-center text-fg-dim text-sm">
+                    No Edge-TTS voices match "{searchQuery}"
                   </div>
-                </button>
-              ))
+                ) : (
+                  filteredVoices.map((voice) => (
+                    <button
+                      key={voice.id}
+                      type="button"
+                      onClick={() => { onChange(voice.id); setIsOpen(false); }}
+                      disabled={disabled}
+                      role="option"
+                      aria-selected={value === voice.id}
+                      className={cn(
+                        'w-full px-4 py-3 text-left transition-all duration-100',
+                        'hover:bg-bg-elevated hover:text-fg-primary',
+                        'focus-visible:outline-none focus-visible:bg-bg-elevated focus-visible:text-fg-primary',
+                        value === voice.id && 'bg-accent-warm/10 text-accent-warm'
+                      )}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-medium truncate">{voice.name}</span>
+                          <span className="text-caption text-fg-dim flex items-center gap-1 truncate">
+                            <Globe className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                            {voice.locale}
+                            {voice.style && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <User className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                                {voice.style}
+                              </>
+                            )}
+                          </span>
+                        </div>
+                        {value === voice.id && (
+                          <span className="text-accent-cyan" aria-hidden="true">✓</span>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </>
+            )}
+
+            {/* Custom Voices Section */}
+            {customVoices && customVoices.length > 0 && (
+              <>
+                <div className="px-4 py-2 text-xs font-semibold text-fg-dim uppercase tracking-wider border-b border-border-subtle">
+                  Custom Voices
+                </div>
+                {filteredCustomVoices.length === 0 ? (
+                  <div className="px-4 py-4 text-center text-fg-dim text-sm">
+                    No custom voices match "{searchQuery}"
+                  </div>
+                ) : (
+                  filteredCustomVoices.map((voice) => (
+                    <button
+                      key={voice.id}
+                      type="button"
+                      onClick={() => { onChange(`custom-${voice.id}`); setIsOpen(false); }}
+                      disabled={disabled}
+                      role="option"
+                      aria-selected={value === `custom-${voice.id}`}
+                      className={cn(
+                        'w-full px-4 py-3 text-left transition-all duration-100',
+                        'hover:bg-bg-elevated hover:text-fg-primary',
+                        'focus-visible:outline-none focus-visible:bg-bg-elevated focus-visible:text-fg-primary',
+                        value === `custom-${voice.id}` && 'bg-accent-warm/10 text-accent-warm'
+                      )}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="font-medium truncate">{voice.name}</span>
+                          <span className="text-caption text-fg-dim flex items-center gap-1 truncate">
+                            <Mic className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                            Custom Voice
+                            {voice.language && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                {voice.language.toUpperCase()}
+                              </>
+                            )}
+                          </span>
+                        </div>
+                        {value === `custom-${voice.id}` && (
+                          <span className="text-accent-cyan" aria-hidden="true">✓</span>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </>
+            )}
+
+            {voices.length === 0 && (!customVoices || customVoices.length === 0) && (
+              <div className="px-4 py-8 text-center text-fg-dim text-sm">
+                No voices available
+              </div>
             )}
           </div>
         </div>

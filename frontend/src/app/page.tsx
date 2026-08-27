@@ -7,6 +7,7 @@ import { GenerationForm } from '@/components/GenerationForm';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { TranscriptViewer } from '@/components/TranscriptViewer';
 import { HistoryList } from '@/components/HistoryList';
+import { CustomVoiceManager } from '@/components/CustomVoiceManager';
 import { useGenerationStore } from '@/store/useGenerationStore';
 import { api } from '@/lib/api';
 import type { GenerationDetail, GenerationHistoryItem, TranscriptOutput } from '@/types';
@@ -18,6 +19,8 @@ function GenerateView({
   isTranscriptOnly,
   handleNewGeneration,
   onViewHistory,
+  selectedCustomVoiceId,
+  setSelectedCustomVoiceId,
 }: {
   current: GenerationDetail | null;
   transcript: TranscriptOutput | null;
@@ -25,6 +28,8 @@ function GenerateView({
   isTranscriptOnly: boolean;
   handleNewGeneration: () => void;
   onViewHistory: () => void;
+  selectedCustomVoiceId: string | undefined;
+  setSelectedCustomVoiceId: (id: string | undefined) => void;
 }) {
   if (!current) return null;
 
@@ -118,6 +123,17 @@ function GenerateView({
               View History
             </button>
           </div>
+
+          <div className="surface-panel p-6">
+            <h3 className="text-caption text-fg-dim mb-4">Custom Voices</h3>
+            <CustomVoiceManager
+              onVoiceSelected={(voice) => {
+                setSelectedCustomVoiceId(`custom-${voice.id}`);
+              }}
+              selectedVoiceId={current?.voice_id?.startsWith('custom-') ? current.voice_id : selectedCustomVoiceId}
+              showUpload={true}
+            />
+          </div>
         </aside>
       </div>
     </section>
@@ -159,6 +175,7 @@ export default function HomePage() {
   const [transcript, setTranscript] = useState<TranscriptOutput | null>(null);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
+  const [selectedCustomVoiceId, setSelectedCustomVoiceId] = useState<string | undefined>(undefined);
 
   const isTranscriptOnly = current?.voice_id === 'transcribed-audio' || current?.voice_id === 'transcript-only' || !current?.audio_url;
   // Check if this is a local transcript (old format with transcript- or transcribe- prefix)
@@ -258,6 +275,7 @@ export default function HomePage() {
     clearError();
     setCurrent(null);
     setTranscript(null);
+    setSelectedCustomVoiceId(undefined);
     setActiveTab('generate');
   };
 
@@ -333,7 +351,7 @@ export default function HomePage() {
                 </p>
               </header>
               <div className="surface-panel p-6 md:p-8">
-                <GenerationForm />
+                <GenerationForm selectedCustomVoiceId={selectedCustomVoiceId} />
               </div>
             </section>
 
@@ -344,6 +362,8 @@ export default function HomePage() {
               isTranscriptOnly={isTranscriptOnly}
               handleNewGeneration={handleNewGeneration}
               onViewHistory={() => setActiveTab('history')}
+              selectedCustomVoiceId={selectedCustomVoiceId}
+              setSelectedCustomVoiceId={setSelectedCustomVoiceId}
             />
           </div>
         ) : (

@@ -6,11 +6,12 @@ import { cn } from '@/lib/utils';
 import { VoiceSelector } from './VoiceSelector';
 import { useGenerationStore } from '@/store/useGenerationStore';
 import { api } from '@/lib/api';
-import type { VoiceInfo, TranscriptOutput } from '@/types';
+import { useCustomVoices } from '@/hooks/useCustomVoices';
+import type { VoiceInfo, TranscriptOutput, CustomVoice } from '@/types';
 
-export function GenerationForm() {
+export function GenerationForm({ selectedCustomVoiceId }: { selectedCustomVoiceId?: string }) {
   const [text, setText] = useState('');
-  const [voiceId, setVoiceId] = useState('');
+  const [voiceId, setVoiceId] = useState(selectedCustomVoiceId || '');
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,13 +22,16 @@ export function GenerationForm() {
   const { isGenerating, setGenerating, setCurrent, addToHistory, setError: setStoreError } =
     useGenerationStore();
 
+  // Load custom voices
+  const { voices: customVoices, loading: customVoicesLoading } = useCustomVoices();
+
   // Load voices on mount
   useEffect(() => {
     const loadVoices = async () => {
       try {
         const response = await api.getVoices();
         setVoices(response.voices);
-        if (response.voices.length > 0 && !voiceId) {
+        if (response.voices.length > 0 && !voiceId && !selectedCustomVoiceId) {
           setVoiceId(response.voices[0].id);
         }
       } catch (err) {
@@ -37,7 +41,14 @@ export function GenerationForm() {
       }
     };
     loadVoices();
-  }, [voiceId]);
+  }, [voiceId, selectedCustomVoiceId]);
+
+  // Update voiceId when selectedCustomVoiceId changes
+  useEffect(() => {
+    if (selectedCustomVoiceId) {
+      setVoiceId(selectedCustomVoiceId);
+    }
+  }, [selectedCustomVoiceId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -225,7 +236,7 @@ export function GenerationForm() {
       {mode === 'speech' && (
         <div className="space-y-2">
           <label htmlFor="voice-select" className="text-caption text-fg-dim">Voice</label>
-          {voicesLoading ? (
+          {voicesLoading || customVoicesLoading ? (
             <div className="h-12 surface-input animate-pulse" aria-busy="true" aria-label="Loading voices" />
           ) : (
             <VoiceSelector
@@ -233,6 +244,7 @@ export function GenerationForm() {
               value={voiceId}
               onChange={setVoiceId}
               voices={voices}
+              customVoices={customVoices}
               disabled={isGenerating}
             />
           )}

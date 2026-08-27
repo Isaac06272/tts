@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.config import settings
 from app.database.session import get_session
-from app.database.models import Generation
+from app.database.models import Generation, CustomVoice
 from app.schemas import (
     GenerateRequest,
     GenerateResponse,
@@ -18,6 +18,9 @@ from app.schemas import (
 # Removed TranscriptOnlyRequest - no longer needed
 from app.services.edge_tts import generate_audio
 from app.services.whisper import transcribe_audio
+from app.services.voice_cloning import clone_voice
+from sqlmodel import select
+from uuid import UUID
 
 router = APIRouter()
 
@@ -35,8 +38,8 @@ async def generate_speech(
     session: AsyncSession = Depends(get_session),
 ):
     """
-    Generate speech from text using Edge-TTS, then transcribe with faster-whisper
-    for segment-level timestamps.
+    Generate speech from text using Edge-TTS or custom voice cloning (XTTS v2),
+    then transcribe with faster-whisper for segment-level timestamps.
     """
     generation_id = uuid4()
     output_dir = Path(settings.OUTPUT_DIR)
@@ -46,8 +49,38 @@ async def generate_speech(
     transcript_path = output_dir / f"{generation_id}.json"
 
     try:
-        # 1. Generate audio via Edge-TTS
-        await generate_audio(request.text, request.voice_id, audio_path)
+        # Check if using custom voice (voice_id starts with "custom-")
+        is_custom_voice = request.voice_id.startswith("custom-")
+
+        if is_custom_voice:
+            # Extract custom voice UUID
+            custom_voice_uuid = request.voice_id.replace("custom-", "")
+
+            # Fetch custom voice from database
+            result = await session.exec(
+                select(CustomVoice).where(CustomVoice.id == UUID(custom_voice_uuid))
+            )
+            custom_voice = result.first()
+
+            if not custom_voice or not custom_voice.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Custom voice not found or inactive"
+                )
+
+            # Get sample path and generate with XTTS
+            sample_path = settings.BASE_DIR / custom_voice.sample_path
+            await clone_voice(
+                text=request.text,
+                speaker_wav=str(sample_path),
+                language=custom_voice.language,
+                output_path=audio_path
+            )
+            voice_id_for_db = f"custom-{custom_voice.id}"
+        else:
+            # Use Edge-TTS (existing logic)
+            await generate_audio(request.text, request.voice_id, audio_path)
+            voice_id_for_db = request.voice_id
 
         # 2. Transcribe with faster-whisper for segment timestamps
         segments = await transcribe_audio(audio_path)
@@ -67,7 +100,7 @@ async def generate_speech(
         generation = Generation(
             id=generation_id,
             text=request.text,
-            voice_id=request.voice_id,
+            voice_id=voice_id_for_db,
             audio_path=str(audio_path),
             transcript_path=str(transcript_path),
             duration=duration,
@@ -86,6 +119,8 @@ async def generate_speech(
             text=generation.text,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         # Cleanup on failure
         if audio_path.exists():

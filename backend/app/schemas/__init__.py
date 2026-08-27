@@ -9,6 +9,11 @@ from .index import (
     SegmentTimestamp,
     TranscriptOutput,
     TranscribeAudioResponse,
+    CustomVoiceBase,
+    CustomVoiceCreate,
+    CustomVoiceUpdate,
+    CustomVoiceRead,
+    CustomVoiceListResponse,
 )
 
 __all__ = [
@@ -22,4 +27,9 @@ __all__ = [
     "SegmentTimestamp",
     "TranscriptOutput",
     "TranscribeAudioResponse",
+    "CustomVoiceBase",
+    "CustomVoiceCreate",
+    "CustomVoiceUpdate",
+    "CustomVoiceRead",
+    "CustomVoiceListResponse",
 ]

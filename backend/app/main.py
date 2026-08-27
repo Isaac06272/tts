@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.database.session import lifespan_db, engine
-from app.api import generate, history, voices
+from app.api import generate, history, voices, custom_voices
 
 
 @asynccontextmanager
@@ -41,10 +41,18 @@ app.mount(
     name="static",
 )
 
+# Static files for voice uploads
+app.mount(
+    "/static/uploads",
+    StaticFiles(directory="static/uploads"),
+    name="static-uploads",
+)
+
 # Routers
 app.include_router(generate.router, prefix="/api", tags=["generate"])
 app.include_router(history.router, prefix="/api", tags=["history"])
 app.include_router(voices.router, prefix="/api", tags=["voices"])
+app.include_router(custom_voices.router, prefix="/api", tags=["custom-voices"])
 
 
 @app.get("/health")

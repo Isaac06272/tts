@@ -37,6 +37,35 @@ export interface TranscribeAudioResponse {
   generation_id: string;
 }
 
+export interface CustomVoice {
+  id: string;
+  name: string;
+  description: string;
+  sample_path: string;
+  voice_id: string;
+  language: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomVoiceCreate {
+  name: string;
+  description?: string;
+  language?: string;
+}
+
+export interface CustomVoiceUpdate {
+  name?: string;
+  description?: string;
+  language?: string;
+  is_active?: boolean;
+}
+
+export interface CustomVoiceListResponse {
+  voices: CustomVoice[];
+}
+
 export interface GenerateResponse {
   id: string;
   audio_url: string;

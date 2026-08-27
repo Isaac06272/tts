@@ -11,6 +11,10 @@ import type {
   VoicesResponse,
   VoiceInfo,
   TranscribeAudioResponse,
+  CustomVoice,
+  CustomVoiceCreate,
+  CustomVoiceUpdate,
+  CustomVoiceListResponse,
 } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -75,4 +79,34 @@ export const api = {
       headers: {},
     });
   },
+
+  // Custom Voices
+  getCustomVoices: () =>
+    fetchApi<CustomVoiceListResponse>('/api/custom-voices'),
+
+  getCustomVoice: (id: string) =>
+    fetchApi<CustomVoice>(`/api/custom-voices/${id}`),
+
+  createCustomVoice: (data: CustomVoiceCreate, file: File) => {
+    const formData = new FormData();
+    formData.append('name', data.name);
+    if (data.description) formData.append('description', data.description);
+    if (data.language) formData.append('language', data.language);
+    formData.append('file', file);
+
+    return fetchApi<CustomVoice>('/api/custom-voices', {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Let browser set Content-Type for multipart
+    });
+  },
+
+  updateCustomVoice: (id: string, data: CustomVoiceUpdate) =>
+    fetchApi<CustomVoice>(`/api/custom-voices/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCustomVoice: (id: string) =>
+    fetchApi<void>(`/api/custom-voices/${id}`, { method: 'DELETE' }),
 };
