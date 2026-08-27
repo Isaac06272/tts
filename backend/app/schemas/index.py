@@ -79,3 +79,37 @@ class TranscribeAudioResponse(BaseModel):
     transcript: TranscriptOutput
     filename: str
     generation_id: str
+
+
+# Custom Voice Schemas
+class CustomVoiceBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str = Field(..., max_length=500)
+    language: str = Field(..., min_length=2, max_length=10)
+
+
+class CustomVoiceCreate(CustomVoiceBase):
+    pass
+
+
+class CustomVoiceUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    language: Optional[str] = Field(None, min_length=2, max_length=10)
+    is_active: Optional[bool] = None
+
+
+class CustomVoiceRead(CustomVoiceBase):
+    id: UUID
+    sample_path: str
+    voice_id: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CustomVoiceListResponse(BaseModel):
+    voices: List[CustomVoiceRead]
