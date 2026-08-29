@@ -1,6 +1,7 @@
 import os
 import torch
 import librosa
+import soundfile as sf
 from pathlib import Path
 from typing import Optional
 from app.core.config import settings
@@ -31,6 +32,25 @@ def initialize_xtts() -> "TTS":  # type: ignore
     return _xtts_model
 
 
+def prepare_reference_audio(speaker_wav: str, max_duration: float = 15.0) -> str:
+    """
+    Prepare reference audio for XTTS v2 by trimming to max_duration if needed.
+    XTTS v2 works best with 3-15 second reference clips. Longer clips significantly
+    slow down processing on CPU without improving quality.
+
+    Returns path to the (possibly trimmed) reference audio file.
+    """
+    duration = librosa.get_duration(path=speaker_wav)
+    if duration <= max_duration:
+        return speaker_wav
+
+    # Trim to max_duration seconds
+    audio, sr = librosa.load(speaker_wav, sr=None, duration=max_duration)
+    trimmed_path = speaker_wav.replace('.wav', f'_trimmed_{max_duration}s.wav')
+    sf.write(trimmed_path, audio, sr)
+    return trimmed_path
+
+
 async def clone_voice(
     text: str,
     speaker_wav: str,
@@ -56,13 +76,23 @@ async def clone_voice(
 
     model = initialize_xtts()
 
+    # Prepare reference audio (trim if too long for faster CPU processing)
+    prepared_wav = prepare_reference_audio(speaker_wav, max_duration=15.0)
+
     # XTTS v2 can clone from a reference audio directly using speaker_wav
     model.tts_to_file(
         text=text,
-        speaker_wav=speaker_wav,
+        speaker_wav=prepared_wav,
         language=language,
         file_path=str(output_path)
     )
+
+    # Clean up trimmed file if created
+    if prepared_wav != speaker_wav and os.path.exists(prepared_wav):
+        try:
+            os.remove(prepared_wav)
+        except OSError:
+            pass
 
     return output_path
 
