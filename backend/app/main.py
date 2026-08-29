@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.database.session import lifespan_db, engine
-from app.api import generate, history, voices, custom_voices
+from app.api import generate, history, voices, custom_voices, voice_preview
 
 
 @asynccontextmanager
@@ -53,6 +53,7 @@ app.include_router(generate.router, prefix="/api", tags=["generate"])
 app.include_router(history.router, prefix="/api", tags=["history"])
 app.include_router(voices.router, prefix="/api", tags=["voices"])
 app.include_router(custom_voices.router, prefix="/api", tags=["custom-voices"])
+app.include_router(voice_preview.router, prefix="/api", tags=["voice-preview"])
 
 
 @app.get("/health")
