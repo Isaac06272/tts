@@ -1,24 +1,27 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Trash2, Mic, Edit, X, Loader2, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { Trash2, Mic, Edit, X, Loader2, Play, Pause, Volume2, VolumeX, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { CustomVoiceUpload } from './CustomVoiceUpload';
+import { useRouter } from 'next/navigation';
 import type { CustomVoice } from '@/types';
 
 interface CustomVoiceManagerProps {
   onVoiceSelected?: (voice: CustomVoice) => void;
   selectedVoiceId?: string;
   showUpload?: boolean;
+  showBackLink?: boolean;
 }
 
-export function CustomVoiceManager({ onVoiceSelected, selectedVoiceId, showUpload = true }: CustomVoiceManagerProps) {
+export function CustomVoiceManager({ onVoiceSelected, selectedVoiceId, showUpload = true, showBackLink = false }: CustomVoiceManagerProps) {
   const [voices, setVoices] = useState<CustomVoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [audioElements, setAudioElements] = useState<Record<string, HTMLAudioElement>>({});
+  const router = useRouter();
 
   useEffect(() => {
     loadVoices();
@@ -89,6 +92,15 @@ export function CustomVoiceManager({ onVoiceSelected, selectedVoiceId, showUploa
 
   return (
     <div className="space-y-4">
+      {showBackLink && (
+        <button
+          onClick={() => router.push('/')}
+          className="flex items-center gap-2 text-sm text-fg-muted hover:text-fg-primary transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to Generate
+        </button>
+      )}
       {showUpload && (
         <CustomVoiceUpload
           onVoiceAdded={(voice) => setVoices(prev => [voice, ...prev])}
