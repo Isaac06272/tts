@@ -120,7 +120,36 @@ export function CustomVoiceUpload({ onVoiceAdded, maxVoices = 10, currentCount =
       setDescription('');
       setLanguage('en');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Upload failed';
+      // Provide user-friendly error messages
+      let message = 'Upload failed. Please try again.';
+
+      if (err instanceof Error) {
+        const errorMessage = err.message.toLowerCase();
+
+        if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+          message = 'Network error. Please check your connection and try again.';
+        } else if (errorMessage.includes('400') || errorMessage.includes('bad request')) {
+          message = 'Invalid request. Please check your input and try again.';
+        } else if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
+          message = 'Authentication required. Please log in and try again.';
+        } else if (errorMessage.includes('403') || errorMessage.includes('forbidden')) {
+          message = 'You do not have permission to upload custom voices.';
+        } else if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+          message = 'Upload endpoint not found. Please contact support.';
+        } else if (errorMessage.includes('413') || errorMessage.includes('payload too large')) {
+          message = 'File is too large. Maximum size is 50MB.';
+        } else if (errorMessage.includes('422') || errorMessage.includes('unprocessable')) {
+          message = 'Invalid file format or corrupted audio file.';
+        } else if (errorMessage.includes('500') || errorMessage.includes('internal server error')) {
+          message = 'Server error. Please try again later.';
+        } else if (errorMessage.includes('503') || errorMessage.includes('service unavailable')) {
+          message = 'Service temporarily unavailable. Please try again later.';
+        } else {
+          // Use the original error message if it's descriptive enough
+          message = err.message;
+        }
+      }
+
       setError(message);
     } finally {
       setUploading(false);
