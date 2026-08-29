@@ -13,6 +13,15 @@ jest.mock('@/hooks/useVoicePreview', () => ({
   })),
 }));
 
+// Mock useVoiceFavorites hook
+jest.mock('@/hooks/useVoiceFavorites', () => ({
+  useVoiceFavorites: jest.fn(() => ({
+    isFavorite: jest.fn((id: string) => false),
+    toggleFavorite: jest.fn(),
+    mounted: true,
+  })),
+}));
+
 // Mock useRouter
 jest.mock('next/navigation', () => ({
   useRouter: () => ({

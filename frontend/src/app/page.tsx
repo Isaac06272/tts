@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { History, Loader2, Sparkles, Mic, FileAudio, Upload, Copy, Download, FileText, Search, ChevronDown, Globe, User, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Trash2, Clock } from 'lucide-react';
+import { History, Loader2, Sparkles, Mic, FileAudio, Upload, Copy, Download, FileText, Search, ChevronDown, Globe, User, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Trash2, Clock, Mic2, Star } from 'lucide-react';
 import { cn, formatTime, formatDate, copyToClipboard, downloadBlob } from '@/lib/utils';
 import { GenerationForm } from '@/components/GenerationForm';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -174,7 +174,7 @@ export default function HomePage() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [transcript, setTranscript] = useState<TranscriptOutput | null>(null);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
+  const [activeTab, setActiveTab] = useState<'generate' | 'history' | 'custom-voices'>('generate');
   const [selectedCustomVoiceId, setSelectedCustomVoiceId] = useState<string | undefined>(undefined);
 
   const isTranscriptOnly = current?.voice_id === 'transcribed-audio' || current?.voice_id === 'transcript-only' || !current?.audio_url;
@@ -330,12 +330,29 @@ export default function HomePage() {
               <History className="h-4 w-4 mr-1.5 inline-block" aria-hidden="true" />
               History
             </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'custom-voices'}
+              aria-controls="custom-voices-panel"
+              id="custom-voices-tab"
+              onClick={() => setActiveTab('custom-voices')}
+              className={cn(
+                'px-4 py-2 text-sm font-medium rounded-lg transition-all duration-150',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-deep',
+                activeTab === 'custom-voices'
+                  ? 'bg-accent-warm text-bg-deep shadow-[0_0_16px_rgba(212,168,67,0.3)]'
+                  : 'text-fg-muted hover:text-fg-primary hover:bg-bg-elevated'
+              )}
+            >
+              <Mic2 className="h-4 w-4 mr-1.5 inline-block" aria-hidden="true" />
+              Custom Voices
+            </button>
           </nav>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-8 lg:py-12" role="tabpanel" id={activeTab === 'generate' ? 'generate-panel' : 'history-panel'}>
+      <main className="flex-1 container mx-auto px-4 py-8 lg:py-12" role="tabpanel" id={activeTab === 'generate' ? 'generate-panel' : activeTab === 'history' ? 'history-panel' : 'custom-voices-panel'}>
         {activeTab === 'generate' ? (
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Generation Form */}
@@ -366,11 +383,13 @@ export default function HomePage() {
               setSelectedCustomVoiceId={setSelectedCustomVoiceId}
             />
           </div>
-        ) : (
+        ) : activeTab === 'history' ? (
           <HistoryView
             handleNewGeneration={handleNewGeneration}
             onLoadGeneration={handleLoadFromHistory}
           />
+        ) : (
+          <CustomVoiceManager showUpload={true} showBackLink={false} />
         )}
       </main>
     </div>

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronDown, Search, Globe, User, Mic, Play, Pause, Loader2, Plus } from 'lucide-react';
+import { ChevronDown, Search, Globe, User, Mic, Play, Pause, Loader2, Plus, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
+import { useVoiceFavorites } from '@/hooks/useVoiceFavorites';
 import { useRouter } from 'next/navigation';
 import type { VoiceInfo, CustomVoice } from '@/types';
 
@@ -35,31 +36,51 @@ export function VoiceSelector({
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
 
   const router = useRouter();
+  const { isFavorite, toggleFavorite, mounted } = useVoiceFavorites();
 
   const filteredVoices = useMemo(() => {
-    if (!searchQuery) return voices;
-    const query = searchQuery.toLowerCase();
-    return voices.filter(
-      (v) =>
-        v.name.toLowerCase().includes(query) ||
-        v.locale.toLowerCase().includes(query) ||
-        v.gender.toLowerCase().includes(query) ||
-        (v.style?.toLowerCase().includes(query) ?? false)
-    );
-  }, [voices, searchQuery]);
+    let result = voices;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (v) =>
+          v.name.toLowerCase().includes(query) ||
+          v.locale.toLowerCase().includes(query) ||
+          v.gender.toLowerCase().includes(query) ||
+          (v.style?.toLowerCase().includes(query) ?? false)
+      );
+    }
+    // Sort: favorites first, then alphabetical by name
+    return result.sort((a, b) => {
+      const aFav = isFavorite(a.id);
+      const bFav = isFavorite(b.id);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [voices, searchQuery, isFavorite]);
 
   const filteredCustomVoices = useMemo(() => {
     if (!customVoices || customVoices.length === 0) return [];
-    if (!searchQuery) return customVoices.filter(v => v.is_active);
-    const query = searchQuery.toLowerCase();
-    return customVoices.filter(
-      v => v.is_active && (
-        v.name.toLowerCase().includes(query) ||
-        v.language.toLowerCase().includes(query) ||
-        v.description.toLowerCase().includes(query)
-      )
-    );
-  }, [customVoices, searchQuery]);
+    let result = customVoices.filter(v => v.is_active);
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        v =>
+          v.name.toLowerCase().includes(query) ||
+          v.language.toLowerCase().includes(query) ||
+          v.description.toLowerCase().includes(query)
+      );
+    }
+    // Sort: favorites first, then alphabetical by name
+    return result.sort((a, b) => {
+      const aFav = isFavorite(`custom-${a.id}`);
+      const bFav = isFavorite(`custom-${b.id}`);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [customVoices, searchQuery, isFavorite]);
 
   const selectedVoice = voices.find((v) => v.id === value);
   const selectedCustomVoice = customVoices?.find((v) => `custom-${v.id}` === value);
@@ -261,6 +282,26 @@ export function VoiceSelector({
                             )}
                           </span>
                         </div>
+                        {/* Favorite button */}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleFavorite(voice.id); }}
+                          disabled={disabled}
+                          className={cn(
+                            'p-1.5 rounded-lg flex-shrink-0 transition-colors',
+                            isFavorite(voice.id) ? 'text-amber-400' : 'text-fg-muted hover:text-amber-400'
+                          )}
+                          aria-label={isFavorite(voice.id) ? `Remove ${voice.name} from favorites` : `Add ${voice.name} to favorites`}
+                          aria-pressed={isFavorite(voice.id)}
+                        >
+                          <Star
+                            className={cn(
+                              'h-4 w-4 flex-shrink-0',
+                              isFavorite(voice.id) && 'fill-current'
+                            )}
+                            aria-hidden="true"
+                          />
+                        </button>
                         {/* Preview button */}
                         {renderPreviewButton(voice.id, voice.name)}
                         {value === voice.id && (
@@ -314,6 +355,26 @@ export function VoiceSelector({
                             )}
                           </span>
                         </div>
+                        {/* Favorite button */}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleFavorite(`custom-${voice.id}`); }}
+                          disabled={disabled}
+                          className={cn(
+                            'p-1.5 rounded-lg flex-shrink-0 transition-colors',
+                            isFavorite(`custom-${voice.id}`) ? 'text-amber-400' : 'text-fg-muted hover:text-amber-400'
+                          )}
+                          aria-label={isFavorite(`custom-${voice.id}`) ? `Remove ${voice.name} from favorites` : `Add ${voice.name} to favorites`}
+                          aria-pressed={isFavorite(`custom-${voice.id}`)}
+                        >
+                          <Star
+                            className={cn(
+                              'h-4 w-4 flex-shrink-0',
+                              isFavorite(`custom-${voice.id}`) && 'fill-current'
+                            )}
+                            aria-hidden="true"
+                          />
+                        </button>
                         {/* Preview button */}
                         {renderPreviewButton(`custom-${voice.id}`, voice.name)}
                         {value === `custom-${voice.id}` && (
