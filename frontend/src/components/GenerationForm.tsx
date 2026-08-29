@@ -7,6 +7,7 @@ import { VoiceSelector } from './VoiceSelector';
 import { useGenerationStore } from '@/store/useGenerationStore';
 import { api } from '@/lib/api';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
+import { useRouter } from 'next/navigation';
 import type { VoiceInfo, TranscriptOutput, CustomVoice } from '@/types';
 
 export function GenerationForm({ selectedCustomVoiceId }: { selectedCustomVoiceId?: string }) {
@@ -21,6 +22,11 @@ export function GenerationForm({ selectedCustomVoiceId }: { selectedCustomVoiceI
 
   const { isGenerating, setGenerating, setCurrent, addToHistory, setError: setStoreError } =
     useGenerationStore();
+  const router = useRouter();
+
+  const handleNavigateToCustomVoices = () => {
+    router.push('/custom-voices');
+  };
 
   // Load custom voices
   const { voices: customVoices, loading: customVoicesLoading } = useCustomVoices();
@@ -246,6 +252,7 @@ export function GenerationForm({ selectedCustomVoiceId }: { selectedCustomVoiceI
               voices={voices}
               customVoices={customVoices}
               disabled={isGenerating}
+              onNavigateToCustomVoices={handleNavigateToCustomVoices}
             />
           )}
         </div>
