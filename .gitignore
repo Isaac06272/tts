@@ -46,4 +46,4 @@ coverage/
 .docker/
 
 # Docs
-docs/superpowers/plans
+docs/_build/
