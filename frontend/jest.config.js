@@ -11,7 +11,7 @@ module.exports = {
   setupFilesAfterEnv: ['@testing-library/jest-dom'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
+      tsconfig: 'tsconfig.jest.json',
     }],
   },
   collectCoverageFrom: [

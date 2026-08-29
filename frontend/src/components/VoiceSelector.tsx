@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronDown, Search, Globe, User, Mic } from 'lucide-react';
+import { ChevronDown, Search, Globe, User, Mic, Play, Pause, Loader2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useVoicePreview } from '@/hooks/useVoicePreview';
+import { useRouter } from 'next/navigation';
 import type { VoiceInfo, CustomVoice } from '@/types';
 
 interface VoiceSelectorProps {
@@ -13,13 +15,26 @@ interface VoiceSelectorProps {
   customVoices?: CustomVoice[];
   disabled?: boolean;
   className?: string;
+  onNavigateToCustomVoices?: () => void;
 }
 
-export function VoiceSelector({ id, value, onChange, voices, customVoices, disabled, className }: VoiceSelectorProps) {
+export function VoiceSelector({
+  id,
+  value,
+  onChange,
+  voices,
+  customVoices,
+  disabled,
+  className,
+  onNavigateToCustomVoices,
+}: VoiceSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+
+  const router = useRouter();
 
   const filteredVoices = useMemo(() => {
     if (!searchQuery) return voices;
@@ -49,6 +64,25 @@ export function VoiceSelector({ id, value, onChange, voices, customVoices, disab
   const selectedVoice = voices.find((v) => v.id === value);
   const selectedCustomVoice = customVoices?.find((v) => `custom-${v.id}` === value);
 
+  // Use the voice preview hook for the currently previewed voice
+  const { play, stop, isPlaying, loading } = useVoicePreview(previewingVoiceId || '');
+
+  // Auto-play when previewingVoiceId changes
+  useEffect(() => {
+    if (previewingVoiceId) {
+      play();
+    }
+  }, [previewingVoiceId, play]);
+
+  const handlePreviewClick = (voiceId: string) => {
+    if (previewingVoiceId === voiceId && isPlaying) {
+      stop();
+      setPreviewingVoiceId(null);
+    } else {
+      setPreviewingVoiceId(voiceId);
+    }
+  };
+
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -73,6 +107,29 @@ export function VoiceSelector({ id, value, onChange, voices, customVoices, disab
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
+
+  const handleVoiceSelect = (voiceId: string) => {
+    onChange(voiceId);
+    setIsOpen(false);
+  };
+
+  const renderPreviewButton = (voiceId: string, voiceName: string) => (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); handlePreviewClick(voiceId); }}
+      disabled={disabled || loading}
+      className="p-1.5 rounded-lg flex-shrink-0 transition-colors"
+      aria-label={previewingVoiceId === voiceId && isPlaying ? `Stop preview of ${voiceName}` : `Preview ${voiceName}`}
+    >
+      {previewingVoiceId === voiceId && isPlaying ? (
+        <Pause className="h-4 w-4 text-accent-cyan" aria-hidden="true" />
+      ) : previewingVoiceId === voiceId && loading ? (
+        <Loader2 className="h-4 w-4 animate-spin text-fg-dim" aria-hidden="true" />
+      ) : (
+        <Play className="h-4 w-4 text-fg-muted hover:text-fg-primary" aria-hidden="true" />
+      )}
+    </button>
+  );
 
   return (
     <div className={cn('relative w-full', className)}>
@@ -174,18 +231,19 @@ export function VoiceSelector({ id, value, onChange, voices, customVoices, disab
                   </div>
                 ) : (
                   filteredVoices.map((voice) => (
-                    <button
+                    <div
                       key={voice.id}
-                      type="button"
-                      onClick={() => { onChange(voice.id); setIsOpen(false); }}
-                      disabled={disabled}
                       role="option"
                       aria-selected={value === voice.id}
+                      onClick={() => handleVoiceSelect(voice.id)}
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleVoiceSelect(voice.id); } }}
                       className={cn(
-                        'w-full px-4 py-3 text-left transition-all duration-100',
+                        'w-full px-4 py-3 text-left transition-all duration-100 cursor-pointer',
                         'hover:bg-bg-elevated hover:text-fg-primary',
                         'focus-visible:outline-none focus-visible:bg-bg-elevated focus-visible:text-fg-primary',
-                        value === voice.id && 'bg-accent-warm/10 text-accent-warm'
+                        value === voice.id && 'bg-accent-warm/10 text-accent-warm',
+                        disabled && 'opacity-40 cursor-not-allowed'
                       )}
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -203,11 +261,13 @@ export function VoiceSelector({ id, value, onChange, voices, customVoices, disab
                             )}
                           </span>
                         </div>
+                        {/* Preview button */}
+                        {renderPreviewButton(voice.id, voice.name)}
                         {value === voice.id && (
-                          <span className="text-accent-cyan" aria-hidden="true">✓</span>
+                          <span className="text-accent-cyan flex-shrink-0" aria-hidden="true">✓</span>
                         )}
                       </div>
-                    </button>
+                    </div>
                   ))
                 )}
               </>
@@ -225,18 +285,19 @@ export function VoiceSelector({ id, value, onChange, voices, customVoices, disab
                   </div>
                 ) : (
                   filteredCustomVoices.map((voice) => (
-                    <button
+                    <div
                       key={voice.id}
-                      type="button"
-                      onClick={() => { onChange(`custom-${voice.id}`); setIsOpen(false); }}
-                      disabled={disabled}
                       role="option"
                       aria-selected={value === `custom-${voice.id}`}
+                      onClick={() => handleVoiceSelect(`custom-${voice.id}`)}
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleVoiceSelect(`custom-${voice.id}`); } }}
                       className={cn(
-                        'w-full px-4 py-3 text-left transition-all duration-100',
+                        'w-full px-4 py-3 text-left transition-all duration-100 cursor-pointer',
                         'hover:bg-bg-elevated hover:text-fg-primary',
                         'focus-visible:outline-none focus-visible:bg-bg-elevated focus-visible:text-fg-primary',
-                        value === `custom-${voice.id}` && 'bg-accent-warm/10 text-accent-warm'
+                        value === `custom-${voice.id}` && 'bg-accent-warm/10 text-accent-warm',
+                        disabled && 'opacity-40 cursor-not-allowed'
                       )}
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -253,13 +314,42 @@ export function VoiceSelector({ id, value, onChange, voices, customVoices, disab
                             )}
                           </span>
                         </div>
+                        {/* Preview button */}
+                        {renderPreviewButton(`custom-${voice.id}`, voice.name)}
                         {value === `custom-${voice.id}` && (
-                          <span className="text-accent-cyan" aria-hidden="true">✓</span>
+                          <span className="text-accent-cyan flex-shrink-0" aria-hidden="true">✓</span>
                         )}
                       </div>
-                    </button>
+                    </div>
                   ))
                 )}
+
+                {/* Add Custom Voice Option */}
+                <div
+                  role="option"
+                  onClick={() => { onNavigateToCustomVoices?.(); setIsOpen(false); }}
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavigateToCustomVoices?.(); setIsOpen(false); } }}
+                  className={cn(
+                    'w-full px-4 py-3 text-left transition-all duration-100 cursor-pointer',
+                    'hover:bg-accent-warm/10 hover:text-accent-warm',
+                    'focus-visible:outline-none focus-visible:bg-accent-warm/10 focus-visible:text-accent-warm',
+                    disabled && 'opacity-40 cursor-not-allowed'
+                  )}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="font-medium truncate text-accent-warm flex items-center gap-2">
+                        <Plus className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                        Add Custom Voice
+                      </span>
+                      <span className="text-caption text-fg-dim flex items-center gap-1 truncate">
+                        <Mic className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                        Create a new cloned voice
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
 
