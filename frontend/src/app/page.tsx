@@ -124,17 +124,7 @@ function GenerateView({
             </button>
           </div>
 
-          <div className="surface-panel p-6">
-            <h3 className="text-caption text-fg-dim mb-4">Custom Voices</h3>
-            <CustomVoiceManager
-              onVoiceSelected={(voice) => {
-                setSelectedCustomVoiceId(`custom-${voice.id}`);
-              }}
-              selectedVoiceId={current?.voice_id?.startsWith('custom-') ? current.voice_id : selectedCustomVoiceId}
-              showUpload={true}
-            />
-          </div>
-        </aside>
+                  </aside>
       </div>
     </section>
   );
