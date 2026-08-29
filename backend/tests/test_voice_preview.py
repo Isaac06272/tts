@@ -7,7 +7,6 @@ from uuid import uuid4
 from app.main import app
 from app.database.models import CustomVoice
 from app.core.config import settings
-from app.database.session import get_session
 
 
 @pytest.mark.asyncio
@@ -58,6 +57,7 @@ async def test_voice_preview_custom_voice_not_found():
 @pytest.mark.asyncio
 async def test_voice_preview_custom_voice():
     """Test that custom voice preview returns the sample file."""
+    # Use a simpler approach - patch the database query at the CustomVoice level
     custom_id = uuid4()
     voice_id = f"custom-{custom_id}"
 
@@ -67,7 +67,6 @@ async def test_voice_preview_custom_voice():
     sample_file = uploads_dir / "sample.mp3"
     sample_file.write_bytes(b"custom voice sample content")
 
-    # Mock database session to return the custom voice
     custom_voice = CustomVoice(
         id=custom_id,
         name="Test Voice",
@@ -78,19 +77,18 @@ async def test_voice_preview_custom_voice():
         is_active=True,
     )
 
-    # Override the get_session dependency - must be async generator
-    mock_session = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.first.return_value = custom_voice
-    mock_session.exec.return_value = mock_result
+    # Patch the session.exec to return our custom voice
+    with patch("app.api.voice_preview.get_session") as mock_get_session:
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.first.return_value = custom_voice
+        mock_session.exec.return_value = mock_result
 
-    async def override_get_session():
-        yield mock_session
+        async def mock_get_session_gen():
+            yield mock_session
 
-    # Need to override before creating the client
-    app.dependency_overrides[get_session] = override_get_session
+        mock_get_session.return_value = mock_get_session_gen()
 
-    try:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             response = await ac.get(f"/api/voice-preview/{voice_id}")
@@ -98,8 +96,6 @@ async def test_voice_preview_custom_voice():
         assert response.status_code == 200
         assert response.headers["content-type"] == "audio/mpeg"
         assert response.content == b"custom voice sample content"
-    finally:
-        app.dependency_overrides.clear()
 
     # Cleanup
     if sample_file.exists():
@@ -137,25 +133,23 @@ async def test_voice_preview_custom_voice_different_formats():
             is_active=True,
         )
 
-        mock_session = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.first.return_value = custom_voice
-        mock_session.exec.return_value = mock_result
+        with patch("app.api.voice_preview.get_session") as mock_get_session:
+            mock_session = AsyncMock()
+            mock_result = MagicMock()
+            mock_result.first.return_value = custom_voice
+            mock_session.exec.return_value = mock_result
 
-        async def override_get_session():
-            yield mock_session
+            async def mock_get_session_gen():
+                yield mock_session
 
-        app.dependency_overrides[get_session] = override_get_session
+            mock_get_session.return_value = mock_get_session_gen()
 
-        try:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as ac:
                 response = await ac.get(f"/api/voice-preview/{voice_id}")
 
             assert response.status_code == 200
             assert response.headers["content-type"] == media_type
-        finally:
-            app.dependency_overrides.clear()
 
         # Cleanup
         if sample_file.exists():
