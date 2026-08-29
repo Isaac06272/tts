@@ -33,12 +33,37 @@ function GenerateView({
 }) {
   if (!current) return null;
 
+  // Handler to fetch and trigger the download using your utility
+  const handleDownloadAudio = async () => {
+    if (!current?.audio_url) return;
+    try {
+      const response = await fetch(current.audio_url);
+      const blob = await response.blob();
+      // You can change .wav to .mp3 if your TTS outputs MP3 files
+      downloadBlob(blob, `tts-generation-${current.id}.wav`); 
+    } catch (error) {
+      console.error('Failed to download audio:', error);
+    }
+  };
+
   return (
     <section aria-labelledby="player-heading" className="space-y-6">
       <header className="flex items-center justify-between">
         <h2 id="player-heading" className="text-h3 text-accent-warm">
           {isTranscriptOnly ? 'Transcript' : 'Playback'}
         </h2>
+        
+        {/* NEW: Download Button */}
+        {!isTranscriptOnly && current.audio_url && (
+          <button
+            onClick={handleDownloadAudio}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-bg-elevated hover:bg-bg-subtle text-fg-primary border border-border-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Download generated audio"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Download
+          </button>
+        )}
       </header>
 
       <div className="grid lg:grid-cols-12 gap-6">
@@ -123,8 +148,7 @@ function GenerateView({
               View History
             </button>
           </div>
-
-                  </aside>
+        </aside>
       </div>
     </section>
   );
