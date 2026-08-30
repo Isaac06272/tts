@@ -1,11 +1,22 @@
-FROM python:3.11-slim
+# Use CUDA-enabled base image for GPU acceleration
+# Use nvidia/cuda base with Python 3.11
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+# Install Python 3.11 and system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlink for python3
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python && ln -sf /usr/bin/python3.11 /usr/bin/python3
 
 WORKDIR /app
 
-# Install system dependencies (ffmpeg for faster-whisper)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+# Install pip
+RUN python3 -m ensurepip --upgrade && python3 -m pip install --no-cache-dir --upgrade pip
 
 # Install Python dependencies
 COPY requirements.txt .

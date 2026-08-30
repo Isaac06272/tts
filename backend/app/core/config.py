@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     WHISPER_DEVICE: str = "cuda"  # cpu, cuda (GPU acceleration)
     WHISPER_COMPUTE_TYPE: str = "float16"  # int8, float16, float32 (float16 for GPU)
 
+    # XTTS v2 (Voice Cloning)
+    XTTS_DEVICE: str = "cuda"  # cpu, cuda (GPU acceleration)
+    XTTS_COMPUTE_TYPE: str = "float16"  # float16, float32 (float16 for GPU)
+
     # Output
     OUTPUT_DIR: str = "static/outputs"
 
